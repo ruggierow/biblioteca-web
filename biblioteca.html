@@ -878,6 +878,11 @@
                         <option value="qualquer">Qualquer grupo</option>
                     </select>
                 </div>
+                <div class="field" style="flex: 0 0 120px; align-self: flex-end;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-bottom:6px;">
+                        <input type="checkbox" id="filtro-com-foto"> Com foto
+                    </label>
+                </div>
                 <button type="button" id="btn-pesquisar" class="btn-primary">Pesquisar</button>
                 <button type="button" id="btn-limpar-filtros" class="btn-ghost">Limpar filtros</button>
                 <button type="button" id="btn-imprimir-resultados" class="btn-ghost">&#128438; Imprimir resultados</button>
@@ -1747,6 +1752,7 @@
             const lc = normalizar(document.getElementById("filtro-local").value);
             const status = document.getElementById("filtro-status").value;
             const filtroGrupo = document.getElementById("filtro-grupo").value;
+            const filtroComFoto = document.getElementById("filtro-com-foto").checked;
 
             return biblioteca
                 .map((livro, indice) => ({ livro, indice }))
@@ -1762,6 +1768,7 @@
                         const id = parseInt(filtroGrupo, 10);
                         if (!Array.isArray(livro.grupoLiteratura) || !livro.grupoLiteratura.includes(id)) return false;
                     }
+                    if (filtroComFoto && !fotos[livro.id]) return false;
                     return true;
                 });
         }
@@ -2439,6 +2446,7 @@
             ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].forEach(id => document.getElementById(id).value = "");
             document.getElementById("filtro-status").value = "todos";
             document.getElementById("filtro-grupo").value = "";
+            document.getElementById("filtro-com-foto").checked = false;
             paginaAtual = 1;
             renderizar();
         });
