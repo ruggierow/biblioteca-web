@@ -3393,6 +3393,12 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         });
 
         async function encerrarInterface() {
+            // Modo nativo macOS: encerra imediatamente via ponte Swift
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
+                return;
+            }
+
             // Salvar no arquivo vinculado (se houver) e avisar o usuario
             if (arquivoHandle && biblioteca.length > 0) {
                 const ok = await salvarNoArquivo();
@@ -3403,12 +3409,6 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                     toast("Atencao: nao foi possivel salvar o arquivo antes de encerrar.", 3500);
                     await new Promise(res => setTimeout(res, 1200));
                 }
-            }
-
-            // Modo nativo macOS: WKWebView não suporta confirm() — encerra diretamente
-            if (window.__BIBLIOTECA_NATIVE__) {
-                try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
-                return;
             }
 
             if (!confirm("Encerrar a interface?")) return;
