@@ -1538,6 +1538,24 @@
                 return;
             }
 
+            // Modo Tauri (Windows): banner fixo mostrando caminho do arquivo (Documents/OneDrive)
+            if (window.__TAURI__) {
+                const banner = document.getElementById("sync-banner");
+                const msg = document.getElementById("sync-mensagem");
+                if (banner) { banner.className = "sync-banner sync-ok"; }
+                if (msg) {
+                    window.__TAURI__.core.invoke("obter_caminho_arquivo").then(caminho => {
+                        if (msg) msg.textContent = `Arquivo: ${caminho} — alterações salvas automaticamente.`;
+                    }).catch(() => {
+                        if (msg) msg.textContent = "Sincronizado — alterações salvas automaticamente.";
+                    });
+                }
+                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                    const b = document.getElementById(id); if (b) b.style.display = "none";
+                });
+                return;
+            }
+
             const banner = document.getElementById("sync-banner");
             const msg = document.getElementById("sync-mensagem");
             const btnVincular = document.getElementById("btn-vincular");
@@ -1735,6 +1753,11 @@
             if (window.__BIBLIOTECA_NATIVE__) {
                 try { window.webkit.messageHandlers.exportar.postMessage(serializarTSV()); } catch(_) {}
                 try { window.webkit.messageHandlers.fotos.postMessage(JSON.stringify(fotos)); } catch(_) {}
+            }
+            // Modo Tauri (Windows): grava TSV e fotos diretamente em Documents via Rust
+            if (window.__TAURI__) {
+                try { window.__TAURI__.core.invoke("salvar_tsv", { conteudo: serializarTSV() }); } catch(_) {}
+                try { window.__TAURI__.core.invoke("salvar_fotos", { conteudo: JSON.stringify(fotos) }); } catch(_) {}
             }
         }
 
@@ -3395,6 +3418,11 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
                 return;
             }
+            // Modo Tauri (Windows): encerra via Rust
+            if (window.__TAURI__) {
+                try { await window.__TAURI__.core.invoke("fechar_janela"); } catch(_) {}
+                return;
+            }
 
             // Salvar no arquivo vinculado (se houver) e avisar o usuario
             if (arquivoHandle && biblioteca.length > 0) {
@@ -3632,6 +3660,35 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
 
         (async () => {
             if (window.__BIBLIOTECA_NATIVE__) return; // dados injetados pelo Swift via WKWebView
+
+            // Modo Tauri (Windows): carrega TSV e fotos diretamente do arquivo em Documents
+            if (window.__TAURI__) {
+                try {
+                    const tsv = await window.__TAURI__.core.invoke("carregar_tsv");
+                    if (tsv) {
+                        const importados = parseTSV(tsv);
+                        biblioteca = importados;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+                        paginaAtual = 1;
+                    }
+                    const fotosJson = await window.__TAURI__.core.invoke("carregar_fotos");
+                    if (fotosJson) {
+                        try {
+                            const fotosArquivo = JSON.parse(fotosJson);
+                            fotos = Object.assign({}, fotos, fotosArquivo);
+                            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                        } catch(_) {}
+                    }
+                    atualizarTudo();
+                    atualizarBannerSync("ok");
+                    toast(`${biblioteca.length} livro(s) carregado(s).`, 3000);
+                } catch(e) {
+                    console.error("Tauri load error:", e);
+                    atualizarBannerSync("ok");
+                }
+                return;
+            }
+
             if (!SUPORTA_FSA) {
                 atualizarBannerSync("nao-suportado");
                 return;
