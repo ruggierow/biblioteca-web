@@ -3405,13 +3405,13 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 }
             }
 
-            if (!confirm("Encerrar a interface?")) return;
-
-            // Modo nativo macOS: pede ao Swift para encerrar o app
+            // Modo nativo macOS: WKWebView não suporta confirm() — encerra diretamente
             if (window.__BIBLIOTECA_NATIVE__) {
                 try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
                 return;
             }
+
+            if (!confirm("Encerrar a interface?")) return;
 
             window.open("", "_self");
             window.close();
