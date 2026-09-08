@@ -977,6 +977,7 @@
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
                 <button type="button" id="btn-importar-excel" class="btn-ghost">Importar Excel (Grupo Literatura)</button>
                 <button type="button" id="btn-exportar" class="btn-accent">Exportar (avulso)</button>
+                <button type="button" id="btn-exportar-fotos-dat" class="btn-ghost" title="Salva as fotos em biblioteca.dat — escolha a pasta Biblioteca no iCloud Drive">&#128247; Exportar Fotos → iCloud Drive</button>
                 <button type="button" id="btn-backup" class="btn-ghost">Backup</button>
                 <button type="button" id="btn-limpar-tudo" class="btn-danger">Apagar tudo</button>
                 <button type="button" id="btn-encerrar" class="btn-ghost">Encerrar</button>
@@ -3350,6 +3351,25 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         }
 
         document.getElementById("btn-exportar").addEventListener("click", exportarArquivo);
+
+        document.getElementById("btn-exportar-fotos-dat").addEventListener("click", async () => {
+            const raw = localStorage.getItem("biblioteca-fotos");
+            const fotos = raw ? JSON.parse(raw) : {};
+            const total = Object.keys(fotos).length;
+            if (total === 0) { alert("Nenhuma foto encontrada."); return; }
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: "biblioteca.dat",
+                    types: [{ description: "Arquivo de fotos", accept: { "application/json": [".dat"] } }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(JSON.stringify(fotos));
+                await writable.close();
+                alert(total + " foto(s) exportada(s) com sucesso!\nSalve na pasta Biblioteca no iCloud Drive.");
+            } catch (e) {
+                if (e.name !== "AbortError") alert("Erro ao exportar: " + e.message);
+            }
+        });
 
         async function encerrarInterface() {
             // Salvar no arquivo vinculado (se houver) e avisar o usuario
