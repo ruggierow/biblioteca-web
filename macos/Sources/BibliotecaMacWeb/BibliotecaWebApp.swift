@@ -17,7 +17,7 @@ struct BibliotecaWebApp {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-
+        
     private var janela: NSWindow!
     private var webView: WKWebView!
     private var gravarTimer: Timer?
@@ -147,6 +147,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             let json = try String(contentsOf: url, encoding: .utf8)
             injetarFotos(json)
+            // Após mesclar o dat no localStorage, exporta de volta para o iCloud.
+            // Garante que fotos que só existiam no localStorage do Mac (antes do
+            // sync existir) cheguem ao biblioteca.dat e portanto ao iPhone.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.exportarLocalStorageParaICloud()
+            }
         } catch {
             print("Erro ao ler biblioteca.dat:", error)
         }
@@ -207,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 var merged = Object.assign({}, locais, novasFotos);
                 fotos = merged;
                 localStorage.setItem("biblioteca-fotos", JSON.stringify(merged));
+                if (typeof atualizarTudo === 'function') atualizarTudo();
             } catch(e) { console.error('Erro ao injetar fotos:', e); }
         })();
         """

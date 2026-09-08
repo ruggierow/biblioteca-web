@@ -2414,11 +2414,7 @@
             paginaAtual = 1;
             const resultados = aplicarFiltros();
             renderizar();
-            const temFiltro = ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].some(id => document.getElementById(id).value.trim())
-                || document.getElementById("filtro-status").value !== "todos";
-            if (temFiltro) {
-                toast(`${resultados.length} livro(s) encontrado(s).`);
-            }
+            toast(`${resultados.length} livro(s) encontrado(s).`);
         }
 
         document.getElementById("btn-pesquisar").addEventListener("click", executarPesquisa);
@@ -3393,8 +3389,9 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         });
 
         async function encerrarInterface() {
-            // Modo nativo macOS: encerra imediatamente via ponte Swift
-            if (window.__BIBLIOTECA_NATIVE__) {
+            // Modo nativo macOS: encerra via ponte Swift.
+            // Testa a presença do handler diretamente, independente da injeção de __BIBLIOTECA_NATIVE__.
+            if (window.__BIBLIOTECA_NATIVE__ || window.webkit?.messageHandlers?.fechar) {
                 try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
                 return;
             }
