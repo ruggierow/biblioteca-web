@@ -1,0 +1,3672 @@
+<!DOCTYPE html>
+<!--
+================================================================================
+  SISTEMA DE GESTAO DE BIBLIOTECA - INTERFACE WEB (biblioteca.html)
+================================================================================
+
+  PROPOSITO
+  ---------
+  Interface grafica em navegador para o mesmo catalogo de livros gerenciado
+  pelo programa em C++ (Biblioteca/main.cpp). E um arquivo HTML auto-contido:
+  estrutura, estilo e logica estao todos aqui, sem dependencias externas.
+  Basta abrir no navegador para usar; o arquivo de dados biblioteca.txt pode
+  ser opcionalmente vinculado para sincronizacao automatica.
+
+  RELACAO COM O PROGRAMA EM C++
+  -----------------------------
+  Tanto este HTML quanto o main.cpp leem e gravam o mesmo arquivo:
+      .../Biblioteca/Biblioteca/biblioteca.txt
+  no formato TSV (campos separados por TAB), com 5 a 7 colunas:
+      titulo \t autor \t tema \t ano \t emprestado \t [comentarios] \t [local]
+  Os dois programas podem ser usados de forma alternada; basta gravar/recarregar.
+  O separador interno "; " e usado dentro dos campos de autor e tema para
+  representar multiplos valores - o C++ ve isso como uma string unica e
+  preserva intacto ao salvar.
+
+  FUNCIONALIDADES PRINCIPAIS
+  --------------------------
+
+  1. CABECALHO COM BOTAO ENCERRAR
+      No alto da pagina, em destaque. Encerra a sessao, oferecendo exportar
+      antes (se nao houver arquivo vinculado) ou gravar no arquivo vinculado.
+
+  2. CADASTRAR LIVRO (formulario superior)
+      Campos: titulo, autor(es), tema(s), ano e comentarios (opcional).
+      Autores e temas sao dinamicos: botao "+ Adicionar autor/tema" permite
+      varios, cada um com botao "x" para remover.
+      Bloqueios automaticos:
+        * DUPLICATA EXATA: mesmo titulo + mesmo conjunto de autores
+          (case-insensitive, sem acentos, sem pontuacao). Cadastro recusado.
+        * LIVRO PARECIDO: distancia de Levenshtein dos titulos >= 85%, ou
+          >= 60% com algum autor em comum. Alerta o usuario, mas permite
+          confirmar.
+
+  3. PESQUISAR E FILTRAR
+      Campos de busca por titulo, autor e tema (todos parciais e
+      case-insensitive) e seletor de status (todos / disponivel / emprestado).
+      Pesquisa dispara ao clicar em "Pesquisar" ou pressionar Enter.
+
+  4. EDITAR LIVRO
+      Duas formas:
+        a) Seletor dedicado no topo da pagina: filtra por texto e escolhe o
+           livro no dropdown. Pode-se editar tambem para apenas adicionar
+           comentarios ou corrigir um erro de digitacao.
+        b) Botao "Editar" em cada linha da tabela.
+      A deteccao de duplicatas so dispara se titulo ou conjunto de autores
+      mudarem (so mudar comentario/tema/ano nao alerta).
+
+  5. TEMAS E AUTORES CADASTRADOS (secao retratil)
+      Lista todos os temas e autores unicos, cada um com a contagem de livros.
+      Cada chip e clicavel: define o filtro correspondente e roda a busca.
+      Estado aberto/fechado persiste em localStorage entre sessoes.
+
+  6. RECUPERACAO DE EMERGENCIA (secao retratil)
+      * Baixar backup JSON: salva todo o catalogo em formato JSON.
+      * Ver localStorage atual: copia o JSON ja gravado no navegador.
+      * Restaurar a partir de um JSON colado (substitui ou anexa).
+
+  7. ARQUIVO biblioteca.txt (secao de sincronizacao)
+      Banner colorido mostra o estado:
+        verde  - sincronizado, gravando direto no arquivo
+        amarelo - vinculado, mas a permissao expirou (clicar para reativar)
+        cinza  - sem vinculo (alteracoes ficam so no navegador)
+      Botoes:
+        * Vincular biblioteca.txt: usa File System Access API para abrir o
+          arquivo. Apos permissao, cada alteracao grava direto no arquivo.
+          O vinculo persiste em IndexedDB entre recargas.
+        * Importar (avulso): le um arquivo TSV qualquer e adiciona/substitui.
+        * Exportar (avulso): baixa o catalogo atual em TSV.
+        * Apagar tudo: remove todos os livros (confirma duas vezes).
+        * Encerrar: salva e encerra a sessao.
+
+  8. LISTA DE LIVROS (tabela principal)
+      Colunas: Titulo, Autor, Tema, Ano, Status, Comentario, Acoes.
+      Ordenacao: por conjunto de autores (livros com os mesmos autores ficam
+      contiguos), e dentro do grupo por titulo. Uma borda azul mais grossa
+      marca o inicio de cada grupo de autores.
+      Paginacao: 10 livros por pagina, com botoes Anterior/Proxima e numeros.
+      Acoes por linha: Editar, Emprestar/Devolver, Imprimir, Remover.
+
+  ARMAZENAMENTO DOS DADOS
+  -----------------------
+  Camadas de persistencia (do mais volatil para o mais durador):
+
+    1. Memoria (variavel "biblioteca")
+       Estado atual em execucao.
+
+    2. localStorage do navegador
+       JSON completo gravado a cada alteracao. Persiste entre sessoes do
+       navegador, MAS some se o cache for limpo.
+
+    3. Arquivo biblioteca.txt (opcional, recomendado)
+       Sincronizado automaticamente via File System Access API quando
+       vinculado. Suportado em Chrome/Edge (em macOS). Safari e Firefox
+       caem para o fluxo manual "Exportar" / "Importar".
+
+    4. Backup JSON manual
+       Botao "Baixar backup JSON" gera um arquivo timestamped com tudo,
+       incluindo comentarios. E o seguro contra perda total.
+
+  IndexedDB e usado apenas para guardar o "file handle" do biblioteca.txt
+  vinculado, permitindo restaurar o vinculo entre recargas da pagina.
+
+  COMPATIBILIDADE ENTRE NAVEGADORES
+  ---------------------------------
+    * Sincronizacao automatica com arquivo: Chrome, Edge, Brave, Opera
+      (qualquer Chromium recente).
+    * Safari e Firefox: tudo funciona, exceto a vinculacao direta de arquivo.
+      Para esses, o fluxo e abrir, editar, e clicar em "Exportar" antes de
+      fechar (a interface forca isso no botao Encerrar).
+
+  ORGANIZACAO INTERNA DESTE ARQUIVO
+  ---------------------------------
+    <style> ........... CSS de todo o layout (cards, tabela, banner, chips,
+                        details retratil, modal de edicao, paginacao, etc.).
+    <body> ............ secoes na seguinte ordem:
+                          header com botao Encerrar
+                          cadastro
+                          pesquisa e filtros
+                          editar livro (seletor dedicado)
+                          temas e autores cadastrados (retratil)
+                          recuperacao de emergencia (retratil)
+                          arquivo biblioteca.txt (sincronizacao)
+                          tabela com paginacao
+                          modal de edicao (oculto, exibido sob demanda)
+                          toast (notificacao flutuante)
+    <script> .......... toda a logica, dividida em blocos comentados:
+                          constantes / estado global
+                          helpers de modelo (Livro, autores, temas)
+                          helpers de comparacao (Levenshtein, similaridade)
+                          serializacao TSV (parseTSV, serializarTSV)
+                          IndexedDB + File System Access API
+                          renderizacao da lista, categorias, seletor edicao
+                          handlers de cadastro, edicao, busca, paginacao
+                          importar / exportar / recuperar JSON
+                          inicializacao
+================================================================================
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestao de Biblioteca</title>
+    <link rel="icon" type="image/png" href="data:image/png;base64,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">
+    <style>
+        :root {
+            --bg: #f4f6fb;
+            --surface: #ffffff;
+            --primary: #2b5fb3;
+            --primary-hover: #214a8c;
+            --accent: #1e8a5f;
+            --accent-hover: #166b48;
+            --danger: #c0392b;
+            --danger-hover: #9d2d22;
+            --muted: #6b7280;
+            --border: #e2e6ee;
+            --text: #1f2937;
+            --shadow: 0 4px 16px rgba(20, 30, 60, 0.06);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2b5fb3, #1e8a5f);
+            color: #fff;
+            padding: 24px 32px;
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        header p {
+            margin: 4px 0 0;
+            opacity: 0.85;
+            font-size: 13px;
+        }
+
+        .header-encerrar {
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            padding: 10px 18px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .header-encerrar:hover {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 32px 64px;
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin: 0 0 16px;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(43, 95, 179, 0.15);
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        button {
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.05s;
+        }
+
+        button:active { transform: translateY(1px); }
+
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        .btn-accent { background: var(--accent); color: #fff; }
+        .btn-accent:hover { background: var(--accent-hover); }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { background: #eef3fb; }
+
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: var(--danger-hover); }
+
+        .btn-small {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .toolbar .field {
+            flex: 1;
+            min-width: 160px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        thead th {
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            background: #fafbfd;
+        }
+
+        tbody td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        tbody tr:hover { background: #f7f9fd; }
+
+        tbody tr.grupo-inicio td {
+            border-top: 2px solid var(--primary);
+        }
+
+        tbody tr.grupo-inicio:first-child td {
+            border-top: none;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-disponivel { background: #e6f5ee; color: #166b48; }
+        .status-emprestado { background: #fde9e7; color: #9d2d22; }
+
+        .actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 32px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .counter {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        .paginacao {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .paginacao button {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+            min-width: 36px;
+            padding: 6px 10px;
+            font-size: 13px;
+        }
+
+        .paginacao button:hover:not(:disabled) {
+            background: #eef3fb;
+            border-color: var(--primary);
+        }
+
+        .paginacao button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .paginacao button.ativa {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        .paginacao .info {
+            font-size: 12px;
+            color: var(--muted);
+            margin: 0 8px;
+        }
+
+        .paginacao .reticencias {
+            padding: 6px 4px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #eef3fb;
+            color: var(--primary);
+            border: 1px solid #d6e1f3;
+            border-radius: 999px;
+            padding: 4px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.05s;
+        }
+
+        .chip:hover {
+            background: #dde8f7;
+        }
+
+        .chip:active { transform: translateY(1px); }
+
+        .chip .contagem {
+            background: rgba(43, 95, 179, 0.15);
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 1px 7px;
+        }
+
+        .chip-autor {
+            background: #e6f5ee;
+            color: #166b48;
+            border-color: #c8e7d6;
+        }
+
+        .chip-autor:hover { background: #d3edde; }
+
+        .chip-autor .contagem { background: rgba(22, 107, 72, 0.15); }
+
+        .filtro-chip {
+            width: 100%;
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--text);
+            background: var(--bg);
+        }
+        .filtro-chip:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: #fff;
+        }
+
+        .chips-scroll {
+            max-height: 130px;
+            overflow-y: auto;
+            padding: 6px 4px 4px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+        }
+        .chips-scroll::-webkit-scrollbar { width: 6px; }
+        .chips-scroll::-webkit-scrollbar-thumb { background: #c8d0e0; border-radius: 3px; }
+
+        .colunas-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .colunas-2 h3 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        @media (max-width: 720px) {
+            .colunas-2 { grid-template-columns: 1fr; }
+        }
+
+        .autor-row, .tema-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .autor-row input, .tema-row input { flex: 1; }
+
+        .btn-remover-autor, .btn-remover-tema {
+            background: #fde9e7;
+            color: var(--danger);
+            border: 1px solid #f4cac6;
+            padding: 0 12px;
+            font-size: 18px;
+            line-height: 1;
+            border-radius: 8px;
+        }
+
+        .btn-remover-autor:hover, .btn-remover-tema:hover { background: #f9d4d0; }
+
+        .btn-add-autor, .btn-add-tema {
+            background: transparent;
+            color: var(--primary);
+            border: 1px dashed var(--primary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .btn-add-autor:hover, .btn-add-tema:hover { background: rgba(43, 95, 179, 0.08); }
+
+        details.retratil > summary {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            user-select: none;
+            margin: 0 0 16px;
+        }
+
+        details.retratil > summary::-webkit-details-marker { display: none; }
+
+        details.retratil > summary .indicador {
+            color: var(--muted);
+            font-size: 14px;
+            transition: transform 0.2s;
+            margin-left: 12px;
+        }
+
+        details.retratil:not([open]) > summary { margin-bottom: 0; }
+        details.retratil:not([open]) > summary .indicador { transform: rotate(-90deg); }
+
+        details.retratil > summary:hover { color: var(--primary); }
+
+        .sync-banner {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+            border: 1px solid;
+        }
+
+        .sync-banner.sync-ok {
+            background: #e6f5ee;
+            border-color: #c8e7d6;
+            color: #166b48;
+        }
+
+        .sync-banner.sync-pendente {
+            background: #fff7e0;
+            border-color: #f3e1a8;
+            color: #8a6914;
+        }
+
+        .sync-banner.sync-off {
+            background: #f4f6fb;
+            border-color: var(--border);
+            color: var(--muted);
+        }
+
+        .sync-banner .ponto {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+
+        .sync-banner .arquivo-info {
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(43, 95, 179, 0.15);
+        }
+
+        .campo-largo {
+            grid-column: 1 / -1;
+        }
+
+        .cell-comentario {
+            max-width: 220px;
+            color: var(--muted);
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        .cell-comentario .conteudo {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .cell-comentario.vazio { color: #cbd2dc; font-style: normal; }
+
+        /* Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 30, 60, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-backdrop.active { display: flex; }
+
+        .modal {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 24px;
+            width: min(92vw, 480px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal h3 { margin: 0 0 16px; font-size: 17px; flex-shrink: 0; }
+
+        .modal form {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal .form-grid {
+            grid-template-columns: 1fr;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        /* Toast */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1f2937;
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 200;
+        }
+
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        @media print {
+            header, .card.no-print, .actions, .toolbar, .button-row { display: none !important; }
+            body { background: #fff; }
+            main { padding: 0; }
+            .card { box-shadow: none; }
+        }
+        .isbn-row { display:flex; align-items:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+        .isbn-row input { flex:1; max-width:220px; }
+        #isbn-status { font-size:13px; color: var(--muted); }
+
+        @keyframes pulso-sync {
+            0%   { transform: scale(1);   box-shadow: 0 0 0 0 currentColor; }
+            40%  { transform: scale(1.9); box-shadow: 0 0 0 5px transparent; }
+            100% { transform: scale(1);   box-shadow: 0 0 0 0 transparent; }
+        }
+        .sync-ponto-ativo {
+            animation: pulso-sync 0.55s ease-out;
+        }
+        .thumb-mini { width:44px; height:44px; border-radius:6px; object-fit:cover; display:block; border:1px solid var(--border); cursor:pointer; }
+        .foto-area { display:flex; align-items:flex-start; gap:12px; margin-top:4px; }
+        .foto-preview-capa { width:96px; height:96px; border-radius:8px; object-fit:cover; border:1px solid var(--border); display:block; }
+        .foto-placeholder { width:96px; height:96px; border-radius:8px; border:2px dashed #c8d5ea; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--muted); font-size:11px; cursor:pointer; background:#f8f9fb; text-align:center; padding:8px; gap:4px; user-select:none; }
+    </style>
+</head>
+<body>
+    <header>
+        <div style="display:flex; align-items:center; gap:16px;">
+            <img src="data:image/png;base64,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"
+                 alt="Biblioteca"
+                 style="width:56px; height:56px; border-radius:22%; box-shadow:0 3px 10px rgba(0,0,0,0.25); background:rgba(255,255,255,0.12); padding:5px; flex-shrink:0;">
+            <div>
+                <h1>Sistema de Gestao de Biblioteca <span style="font-size:13px;font-weight:400;opacity:0.7;vertical-align:middle;">v.1.8.1</span></h1>
+                <p>Interface web compativel com o arquivo <code>biblioteca.txt</code> (TSV)</p>
+            </div>
+        </div>
+        <button type="button" id="btn-encerrar-topo" class="header-encerrar" title="Encerrar a interface">Encerrar</button>
+    </header>
+
+    <main>
+        <section class="card no-print">
+            <h2>Cadastrar livro</h2>
+            <form id="form-cadastro">
+                <div class="isbn-row">
+                    <input type="text" id="isbn-input" placeholder="ISBN (10 ou 13 dígitos)" maxlength="17">
+                    <button type="button" id="btn-buscar-isbn">Buscar ISBN</button>
+                    <span id="isbn-status"></span>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label for="titulo">Titulo</label>
+                        <input type="text" id="titulo" required>
+                    </div>
+                    <div>
+                        <label>Autor(es)</label>
+                        <div id="autores-container"></div>
+                        <button type="button" class="btn-add-autor" data-target="autores-container">+ Adicionar autor</button>
+                    </div>
+                    <div>
+                        <label>Tema(s)</label>
+                        <div id="temas-container"></div>
+                        <button type="button" class="btn-add-tema" data-target="temas-container">+ Adicionar tema</button>
+                    </div>
+                    <div>
+                        <label for="ano">Ano</label>
+                        <input type="number" id="ano" min="0" required>
+                    </div>
+                    <div>
+                        <label for="local">Local do exemplar</label>
+                        <input type="text" id="local" placeholder="Ex.: Estante 3, sala de estudo">
+                    </div>
+                    <div class="campo-largo">
+                        <label for="comentarios">Comentarios (opcional)</label>
+                        <textarea id="comentarios" rows="3" placeholder="Anotacoes pessoais, resumo, observacoes..."></textarea>
+                    </div>
+                    <div class="campo-largo">
+                        <label>Grupos de Literatura</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;font-size:14px;color:var(--text);font-weight:400;">
+                            <input type="checkbox" id="grupo-participa" style="width:auto;cursor:pointer;">
+                            Livro discutido em grupo de literatura
+                        </label>
+                        <div id="grupo-multi" style="display:none;margin-top:8px;padding:8px 10px;background:#f5f8ff;border:1px solid #c8d5ea;border-radius:6px;">
+                            <div id="grupo-checkboxes" style="display:flex;flex-direction:column;gap:4px;"></div>
+                            <button type="button" id="btn-gerenciar-grupos-cadastro" style="margin-top:8px;font-size:12px;color:#2b5fb3;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Gerenciar grupos...</button>
+                        </div>
+                    </div>
+                    <div class="campo-largo">
+                        <label>Foto da capa (opcional)</label>
+                        <div class="foto-area">
+                            <div id="foto-cadastro-placeholder" class="foto-placeholder" onclick="document.getElementById('foto-cadastro-input').click()">
+                                <span style="font-size:24px;">📷</span>
+                                <span>Adicionar foto</span>
+                            </div>
+                            <img id="foto-cadastro-img" class="foto-preview-capa" style="display:none;" alt="Foto da capa">
+                            <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+                                <button type="button" class="btn-ghost btn-small" onclick="document.getElementById('foto-cadastro-input').click()">Selecionar foto…</button>
+                                <button type="button" id="btn-foto-cadastro-remover" class="btn-ghost btn-small" style="display:none;color:#d9534f;">Remover foto</button>
+                            </div>
+                        </div>
+                        <input type="file" id="foto-cadastro-input" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button type="submit" class="btn-primary">Cadastrar</button>
+                    <button type="button" id="btn-limpar-cadastro" class="btn-ghost">Limpar</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="card no-print">
+            <h2>Pesquisar e filtrar</h2>
+            <div class="toolbar">
+                <div class="field">
+                    <label for="filtro-titulo">Titulo (parcial)</label>
+                    <input type="text" id="filtro-titulo" placeholder="Ex.: dom casm">
+                </div>
+                <div class="field">
+                    <label for="filtro-autor">Autor (parcial)</label>
+                    <input type="text" id="filtro-autor" placeholder="Ex.: machado" list="datalist-autores">
+                </div>
+                <div class="field">
+                    <label for="filtro-tema">Tema (parcial)</label>
+                    <input type="text" id="filtro-tema" placeholder="Ex.: romance" list="datalist-temas">
+                </div>
+                <div class="field">
+                    <label for="filtro-local">Local (parcial)</label>
+                    <input type="text" id="filtro-local" placeholder="Ex.: estante 3">
+                </div>
+                <div class="field" style="flex: 0 0 160px;">
+                    <label for="filtro-status">Status</label>
+                    <select id="filtro-status">
+                        <option value="todos">Todos</option>
+                        <option value="disponivel">Disponiveis</option>
+                        <option value="emprestado">Emprestados</option>
+                    </select>
+                </div>
+                <div class="field" style="flex: 0 0 180px;">
+                    <label for="filtro-grupo">Grupo de literatura</label>
+                    <select id="filtro-grupo">
+                        <option value="">Todos os livros</option>
+                        <option value="qualquer">Qualquer grupo</option>
+                    </select>
+                </div>
+                <button type="button" id="btn-pesquisar" class="btn-primary">Pesquisar</button>
+                <button type="button" id="btn-limpar-filtros" class="btn-ghost">Limpar filtros</button>
+                <button type="button" id="btn-imprimir-resultados" class="btn-ghost">&#128438; Imprimir resultados</button>
+                <button type="button" id="btn-exportar-excel-resultados" class="btn-ghost">&#128202; Exportar Excel (resultados)</button>
+            </div>
+        </section>
+
+        <section class="card no-print">
+            <h2>Editar livro</h2>
+            <p style="margin:0 0 12px; color: var(--muted); font-size: 13px;">
+                Selecione um livro para corrigir um cadastro com erro. Voce tambem pode clicar em <strong>Editar</strong> na linha do livro na tabela abaixo.
+            </p>
+            <div class="toolbar">
+                <div class="field" style="flex: 2;">
+                    <label for="edit-busca">Filtrar lista por titulo, autor ou tema</label>
+                    <input type="text" id="edit-busca" placeholder="Digite para filtrar a lista...">
+                </div>
+                <div class="field" style="flex: 3;">
+                    <label for="edit-seletor">Livro a editar</label>
+                    <select id="edit-seletor"></select>
+                </div>
+                <button type="button" id="btn-abrir-edicao" class="btn-primary">Editar selecionado</button>
+            </div>
+        </section>
+
+        <section class="card no-print">
+            <details class="retratil" id="categorias-details" open>
+                <summary>
+                    <span>Temas e Autores cadastrados <span class="counter" id="contador-categorias"></span></span>
+                    <span class="indicador">&#9662;</span>
+                </summary>
+                <p style="margin:12px 0; color: var(--muted); font-size: 13px;">
+                    Clique em um item para filtrar a lista por aquele tema ou autor.
+                </p>
+                <div class="colunas-2">
+                    <div>
+                        <h3>Temas</h3>
+                        <input type="text" id="filtro-chip-tema" class="filtro-chip" placeholder="Filtrar temas…">
+                        <div class="chips chips-scroll" id="lista-temas"></div>
+                    </div>
+                    <div>
+                        <h3>Autores</h3>
+                        <input type="text" id="filtro-chip-autor" class="filtro-chip" placeholder="Filtrar autores…">
+                        <div class="chips chips-scroll" id="lista-autores"></div>
+                    </div>
+                </div>
+            </details>
+        </section>
+
+        <section class="card no-print">
+            <details class="retratil">
+                <summary>
+                    <span>Recuperacao de emergencia (backup JSON)</span>
+                    <span class="indicador">&#9662;</span>
+                </summary>
+                <p style="margin:12px 0; color: var(--muted); font-size: 13px;">
+                    Use esta secao se voce precisa recuperar livros a partir de um backup JSON
+                    (por exemplo, o valor da chave <code>biblioteca-livros</code> no localStorage),
+                    ou salvar uma copia de seguranca em formato JSON.
+                </p>
+                <div class="button-row">
+                    <button type="button" id="btn-backup-json" class="btn-accent">Baixar backup JSON</button>
+                    <button type="button" id="btn-mostrar-storage" class="btn-ghost">Ver localStorage atual</button>
+                </div>
+                <div style="margin-top:14px;">
+                    <label for="textarea-restaurar" style="display:block; font-size:12px; color: var(--muted); margin-bottom:4px;">
+                        Cole aqui o JSON do backup (array de livros) e clique em Restaurar:
+                    </label>
+                    <textarea id="textarea-restaurar" rows="6" style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; font-family: ui-monospace, Menlo, monospace; font-size: 12px;"></textarea>
+                    <div class="button-row" style="margin-top:6px;">
+                        <button type="button" id="btn-restaurar-json" class="btn-primary">Restaurar</button>
+                        <button type="button" id="btn-limpar-textarea" class="btn-ghost">Limpar texto</button>
+                    </div>
+                </div>
+            </details>
+        </section>
+
+        <section class="card no-print">
+            <h2>Arquivo biblioteca.txt</h2>
+            <div id="sync-banner" class="sync-banner sync-off">
+                <span class="ponto"></span>
+                <span id="sync-mensagem">Inicializando...</span>
+            </div>
+            <p style="margin:0 0 12px; color: var(--muted); font-size: 13px;">
+                Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente.
+                Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.
+            </p>
+            <div class="button-row">
+                <button type="button" id="btn-vincular" class="btn-primary">Vincular biblioteca.txt</button>
+                <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
+                <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
+                <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
+                <button type="button" id="btn-importar-excel" class="btn-ghost">Importar Excel (Grupo Literatura)</button>
+                <button type="button" id="btn-exportar" class="btn-accent">Exportar (avulso)</button>
+                <button type="button" id="btn-backup" class="btn-ghost">Backup</button>
+                <button type="button" id="btn-limpar-tudo" class="btn-danger">Apagar tudo</button>
+                <button type="button" id="btn-encerrar" class="btn-ghost">Encerrar</button>
+                <input type="file" id="arquivo-importar" accept=".txt,.tsv,text/plain" style="display:none">
+                <input type="file" id="arquivo-excel" accept=".xlsx" style="display:none">
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>
+                Lista de livros
+                <span class="counter" id="contador"></span>
+            </h2>
+            <div id="tabela-container"></div>
+        </section>
+    </main>
+
+    <!-- Modal de edicao -->
+    <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+            <h3>Editar livro</h3>
+            <form id="form-edicao">
+                <input type="hidden" id="edit-indice">
+                <div class="form-grid">
+                    <div>
+                        <label for="edit-titulo">Titulo</label>
+                        <input type="text" id="edit-titulo" required>
+                    </div>
+                    <div>
+                        <label>Autor(es)</label>
+                        <div id="edit-autores-container"></div>
+                        <button type="button" class="btn-add-autor" data-target="edit-autores-container">+ Adicionar autor</button>
+                    </div>
+                    <div>
+                        <label>Tema(s)</label>
+                        <div id="edit-temas-container"></div>
+                        <button type="button" class="btn-add-tema" data-target="edit-temas-container">+ Adicionar tema</button>
+                    </div>
+                    <div>
+                        <label for="edit-ano">Ano</label>
+                        <input type="number" id="edit-ano" min="0" required>
+                    </div>
+                    <div>
+                        <label for="edit-emprestado">Status</label>
+                        <select id="edit-emprestado">
+                            <option value="0">Disponivel</option>
+                            <option value="1">Emprestado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-local">Local do exemplar</label>
+                        <input type="text" id="edit-local">
+                    </div>
+                    <div>
+                        <label for="edit-comentarios">Comentarios (opcional)</label>
+                        <textarea id="edit-comentarios" rows="3"></textarea>
+                    </div>
+                    <div>
+                        <label>Grupos de Literatura</label>
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:6px;font-size:14px;color:var(--text);font-weight:400;">
+                            <input type="checkbox" id="edit-grupo-participa" style="width:auto;cursor:pointer;">
+                            Livro discutido em grupo de literatura
+                        </label>
+                        <div id="edit-grupo-multi" style="display:none;margin-top:8px;padding:8px 10px;background:#f5f8ff;border:1px solid #c8d5ea;border-radius:6px;">
+                            <div id="edit-grupo-checkboxes" style="display:flex;flex-direction:column;gap:4px;"></div>
+                            <button type="button" id="btn-gerenciar-grupos-edicao" style="margin-top:8px;font-size:12px;color:#2b5fb3;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Gerenciar grupos...</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label>Foto da capa</label>
+                        <div class="foto-area">
+                            <div id="edit-foto-placeholder" class="foto-placeholder" onclick="document.getElementById('edit-foto-input').click()">
+                                <span style="font-size:24px;">📷</span>
+                                <span>Adicionar foto</span>
+                            </div>
+                            <img id="edit-foto-img" class="foto-preview-capa" style="display:none;" alt="Foto da capa">
+                            <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+                                <button type="button" class="btn-ghost btn-small" onclick="document.getElementById('edit-foto-input').click()">Selecionar foto…</button>
+                                <button type="button" id="btn-edit-foto-remover" class="btn-ghost btn-small" style="display:none;color:#d9534f;">Remover foto</button>
+                            </div>
+                        </div>
+                        <input type="file" id="edit-foto-input" accept="image/*" style="display:none;">
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-ghost" id="btn-cancelar-edicao">Cancelar</button>
+                    <button type="submit" class="btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de grupos de literatura -->
+    <div id="modal-grupos" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.55); z-index:9010; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:12px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <h3 style="margin:0 0 4px; font-size:16px; color:#1e3a5f;">Grupos de Literatura</h3>
+            <p style="margin:0 0 14px; font-size:12px; color:#6b7280;">Edite os nomes ou adicione novos grupos. O Grupo 1 nao pode ser removido.</p>
+            <div id="lista-grupos-modal" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;"></div>
+            <button type="button" id="btn-adicionar-grupo" class="btn-ghost" style="margin-top:12px;width:100%;">+ Adicionar grupo</button>
+            <div style="margin-top:16px; text-align:right;">
+                <button type="button" id="btn-fechar-modal-grupos" class="btn-primary">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <!-- Modal de primeiro uso -->
+    <div id="modal-primeiro-uso" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.6); z-index:9001; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:16px; padding:32px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="font-size:48px; margin-bottom:10px;">📚</div>
+                <h2 style="font-size:18px; font-weight:700; color:#1e3a5f; margin:0 0 6px;">Bem-vindo ao Sistema de Biblioteca!</h2>
+                <p style="font-size:13px; color:#6b7280; margin:0;">Primeira abertura detectada. Como deseja armazenar seus livros?</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
+                <button id="btn-puso-vincular" style="display:flex; align-items:flex-start; gap:14px; background:#f0f5ff; border:2px solid #2b5fb3; border-radius:10px; padding:14px 16px; cursor:pointer; text-align:left; width:100%;">
+                    <span style="font-size:22px; flex-shrink:0;">📁</span>
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:#1e3a5f;">Selecionar ou criar arquivo</div>
+                        <div style="font-size:12px; color:#4b5563; margin-top:2px;">Escolhe onde salvar o <code style="background:#e8edf8;padding:1px 4px;border-radius:3px;">biblioteca.txt</code> no seu computador. Recomendado.</div>
+                    </div>
+                </button>
+                <button id="btn-puso-importar" style="display:flex; align-items:flex-start; gap:14px; background:#f0fdf4; border:2px solid #1e8a5f; border-radius:10px; padding:14px 16px; cursor:pointer; text-align:left; width:100%;">
+                    <span style="font-size:22px; flex-shrink:0;">📥</span>
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:#166b48;">Importar arquivo existente</div>
+                        <div style="font-size:12px; color:#4b5563; margin-top:2px;">Já tem um <code style="background:#e8f5ee;padding:1px 4px;border-radius:3px;">biblioteca.txt</code> de outra instalação? Importe-o aqui.</div>
+                    </div>
+                </button>
+                <button id="btn-puso-depois" style="display:flex; align-items:flex-start; gap:14px; background:#f9fafb; border:2px solid #e2e6ee; border-radius:10px; padding:14px 16px; cursor:pointer; text-align:left; width:100%;">
+                    <span style="font-size:22px; flex-shrink:0;">⏭</span>
+                    <div>
+                        <div style="font-size:13px; font-weight:700; color:#374151;">Decidir depois</div>
+                        <div style="font-size:12px; color:#4b5563; margin-top:2px;">Os dados ficam salvos apenas no navegador. Você pode vincular um arquivo a qualquer momento.</div>
+                    </div>
+                </button>
+            </div>
+            <p style="font-size:11px; color:#9ca3af; text-align:center; margin:0;">
+                💡 O arquivo <code>biblioteca.txt</code> é compatível com o programa em C++ e pode ser usado nos dois.
+            </p>
+        </div>
+    </div>
+
+
+    <!-- Modal de aviso de compatibilidade com navegador -->
+    <div id="modal-navegador" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.55); z-index:9000; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:16px; padding:28px 32px; max-width:440px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                <span style="font-size:28px;">⚠️</span>
+                <h2 style="font-size:16px; font-weight:700; color:#1e3a5f; margin:0;">Aviso de Compatibilidade</h2>
+            </div>
+            <p style="font-size:13px; color:#374151; margin:0 0 12px; line-height:1.6;">
+                Você está usando o <strong id="nome-navegador-aviso"></strong>. Este navegador tem as seguintes limitações com este programa:
+            </p>
+            <ul id="lista-limitacoes-navegador" style="font-size:13px; color:#374151; margin:0 0 18px; padding-left:20px; line-height:1.8;"></ul>
+            <p style="font-size:12px; color:#6b7280; margin:0 0 20px;">
+                Para uso completo, prefira o <strong>Google Chrome</strong>, <strong>Firefox</strong> ou o <strong>aplicativo instalável</strong> (Biblioteca.app).
+            </p>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#6b7280; cursor:pointer; margin-right:auto;">
+                    <input type="checkbox" id="chk-nao-mostrar-aviso"> Não mostrar novamente
+                </label>
+                <button onclick="fecharModalNavegador()" style="background:#2b5fb3; color:#fff; border:none; border-radius:8px; padding:9px 22px; font-size:13px; font-weight:600; cursor:pointer;">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // CONSTANTES E ESTADO GLOBAL
+        // =====================================================================
+        // STORAGE_KEY       - chave do localStorage onde o JSON e gravado.
+        // LIVROS_POR_PAGINA - tamanho da pagina na listagem (10).
+        // SEP_AUTORES       - separador interno usado dentro de "autor" e
+        //                     "tema" do TSV quando ha varios valores. O C++
+        //                     ve isso como uma string unica.
+        // SUPORTA_FSA       - true se o navegador implementa File System
+        //                     Access API (Chrome/Edge/Brave...).
+        // DB_NAME/STORE/KEY - identificadores do IndexedDB onde guardamos
+        //                     o file handle do biblioteca.txt vinculado.
+        // biblioteca        - array de livros em memoria (estado principal).
+        // paginaAtual       - pagina visivel na tabela (1-based).
+        // arquivoHandle     - FileSystemFileHandle do biblioteca.txt vinculado,
+        //                     ou null quando nao ha vinculo.
+        const STORAGE_KEY = "biblioteca-livros";
+        const GRUPOS_KEY  = "biblioteca-grupos";
+        const LIVROS_POR_PAGINA = 10;
+        const SEP_AUTORES = ";";
+        // Edge com file:// tem restricoes na File System Access API (showOpenFilePicker nao abre dialogo).
+        // Nesses casos desabilitamos FSA e usamos o fluxo de Importar/Exportar, que e confiavel.
+        const _ehEdgeComArquivo = /Edg\/\d/.test(navigator.userAgent) && location.protocol === "file:";
+        const SUPORTA_FSA = !_ehEdgeComArquivo && "showOpenFilePicker" in window && "showSaveFilePicker" in window;
+        const DB_NAME = "biblioteca-handles";
+        const STORE_HANDLES = "handles";
+        const KEY_HANDLE = "arquivo-biblioteca";
+        let grupos = [];
+        carregarGrupos();
+        let biblioteca = carregar();
+        let paginaAtual = 1;
+        let arquivoHandle = null;
+
+        const FOTOS_KEY = "biblioteca-fotos";
+        let fotos = (() => { try { return JSON.parse(localStorage.getItem(FOTOS_KEY)) || {}; } catch { return {}; } })();
+        let _fotoPendenteCadastro = null;
+        let _fotoPendenteEdicao = null;
+        let _fotoRemovidaEdicao = false;
+
+        function gerarId(titulo, autores) {
+            // ID determinístico: mesmo livro → mesmo ID em qualquer recarga.
+            const partes = [(titulo || "").toLowerCase().replace(/\s+/g, " ").trim()];
+            if (Array.isArray(autores)) {
+                partes.push(...autores.map(a => (a || "").toLowerCase().replace(/\s+/g, " ").trim()).filter(Boolean).sort());
+            }
+            const chave = partes.join("\x00");
+            let h1 = 2166136261, h2 = 2246822519;
+            for (let i = 0; i < chave.length; i++) {
+                const c = chave.charCodeAt(i);
+                h1 = (Math.imul(h1 ^ c, 16777619)) >>> 0;
+                h2 = (Math.imul(h2 ^ (c + i + 1), 16777619)) >>> 0;
+            }
+            return h1.toString(36) + h2.toString(36);
+        }
+
+        function redimensionarImagem(file, maxPx) {
+            maxPx = maxPx || 200;
+            return new Promise((resolve) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const escala = Math.min(1, maxPx / Math.max(img.width, img.height, 1));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.round(img.width * escala);
+                    canvas.height = Math.round(img.height * escala);
+                    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL("image/jpeg", 0.82));
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+                img.src = url;
+            });
+        }
+
+        function resetarFotoCadastro() {
+            _fotoPendenteCadastro = null;
+            const img = document.getElementById("foto-cadastro-img");
+            const ph = document.getElementById("foto-cadastro-placeholder");
+            img.src = "";
+            img.style.display = "none";
+            ph.style.display = "";
+            document.getElementById("btn-foto-cadastro-remover").style.display = "none";
+            document.getElementById("foto-cadastro-input").value = "";
+        }
+
+        // =====================================================================
+        // HELPERS DE MODELO E NORMALIZACAO DE TEXTO
+        // =====================================================================
+        // Pequenas funcoes que trabalham com o objeto Livro: ler autores/temas
+        // de forma tolerante (suporta formato legado com campo "autor" string
+        // singular), gerar texto exibido, normalizar o livro inteiro.
+        // normalizar() apenas converte para minusculas.
+        // normalizarComparacao() faz uma normalizacao mais agressiva (sem
+        // acentos, sem pontuacao, espacos colapsados) usada para detectar
+        // duplicatas e calcular similaridade.
+
+        const normalizar = (texto) => (texto || "").toString().toLowerCase();
+
+        function obterAutores(livro) {
+            if (Array.isArray(livro.autores)) return livro.autores.filter(a => a && a.toString().trim());
+            if (livro.autor) return [livro.autor];
+            return [];
+        }
+
+        function autoresParaTexto(livro, separador = ", ") {
+            return obterAutores(livro).join(separador);
+        }
+
+        function obterTemas(livro) {
+            if (Array.isArray(livro.temas)) return livro.temas.filter(t => t && t.toString().trim());
+            if (livro.tema) return [livro.tema];
+            return [];
+        }
+
+        function temasParaTexto(livro, separador = ", ") {
+            return obterTemas(livro).join(separador);
+        }
+
+        function normalizarLivro(livro) {
+            const autores = obterAutores(livro).map(a => a.toString().trim()).filter(a => a.length > 0);
+            const temas = obterTemas(livro).map(t => t.toString().trim()).filter(t => t.length > 0);
+            livro.autores = autores;
+            livro.temas = temas;
+            livro.id = gerarId(livro.titulo, autores);
+            livro.comentarios = (livro.comentarios || "").toString();
+            livro.local = (livro.local || "").toString();
+            if (typeof livro.grupoLiteratura === "boolean") {
+                livro.grupoLiteratura = livro.grupoLiteratura ? [1] : [];
+            } else if (!Array.isArray(livro.grupoLiteratura)) {
+                livro.grupoLiteratura = [];
+            }
+            delete livro.autor;
+            delete livro.tema;
+            return livro;
+        }
+
+        // =====================================================================
+        // DETECCAO DE DUPLICATAS E SIMILARIDADE
+        // =====================================================================
+        // distanciaLevenshtein() conta a quantidade minima de operacoes de
+        // edicao (insercao/remocao/substituicao) para transformar uma string
+        // na outra. similaridade() converte essa distancia em uma razao
+        // entre 0 e 1 (1 = identico).
+        // encontrarDuplicados() classifica os livros existentes em dois grupos:
+        //   exatos   - mesmo titulo normalizado E mesmo conjunto de autores.
+        //   similares- titulo com >= 85% de similaridade, ou >= 60% com algum
+        //              autor em comum.
+        // O parametro ignorarIndice permite excluir o proprio livro durante
+        // uma edicao (assim ele nao e visto como duplicata de si mesmo).
+
+        function normalizarComparacao(s) {
+            return (s || "").toString().toLowerCase()
+                .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+                .replace(/[^\w\s]/g, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function distanciaLevenshtein(a, b) {
+            const m = a.length, n = b.length;
+            if (m === 0) return n;
+            if (n === 0) return m;
+            let prev = new Array(n + 1);
+            let curr = new Array(n + 1);
+            for (let j = 0; j <= n; j++) prev[j] = j;
+            for (let i = 1; i <= m; i++) {
+                curr[0] = i;
+                for (let j = 1; j <= n; j++) {
+                    curr[j] = a[i - 1] === b[j - 1]
+                        ? prev[j - 1]
+                        : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+                }
+                [prev, curr] = [curr, prev];
+            }
+            return prev[n];
+        }
+
+        function similaridade(a, b) {
+            const an = normalizarComparacao(a);
+            const bn = normalizarComparacao(b);
+            if (an.length === 0 && bn.length === 0) return 1;
+            const max = Math.max(an.length, bn.length);
+            if (max === 0) return 1;
+            return 1 - distanciaLevenshtein(an, bn) / max;
+        }
+
+        function encontrarDuplicados(novoTitulo, novosAutores, ignorarIndice = -1) {
+            const tituloNorm = normalizarComparacao(novoTitulo);
+            const autoresNorm = novosAutores.map(normalizarComparacao);
+            const setAutoresNorm = new Set(autoresNorm);
+            const exatos = [];
+            const similares = [];
+
+            for (let i = 0; i < biblioteca.length; i++) {
+                if (i === ignorarIndice) continue;
+                const livro = biblioteca[i];
+                const tituloExistente = normalizarComparacao(livro.titulo);
+                const autoresExistentes = obterAutores(livro).map(normalizarComparacao);
+                const setExistentes = new Set(autoresExistentes);
+
+                const mesmoTitulo = tituloExistente === tituloNorm;
+                const mesmosAutores = setAutoresNorm.size === setExistentes.size
+                    && [...setAutoresNorm].every(a => setExistentes.has(a));
+
+                if (mesmoTitulo && mesmosAutores) {
+                    exatos.push({ indice: i, livro });
+                    continue;
+                }
+
+                const simTitulo = similaridade(tituloExistente, tituloNorm);
+                const autoresInter = [...setAutoresNorm].filter(a => setExistentes.has(a)).length;
+
+                if (simTitulo >= 0.85 || (simTitulo >= 0.6 && autoresInter > 0) || (mesmoTitulo && autoresInter > 0)) {
+                    similares.push({ indice: i, livro, simTitulo: Math.round(simTitulo * 100) });
+                }
+            }
+            return { exatos, similares };
+        }
+
+        // =====================================================================
+        // PERSISTENCIA: localStorage, IndexedDB, File System Access API
+        // =====================================================================
+        // carregar()       - le o JSON do localStorage e normaliza cada livro
+        //                    (migra campos antigos como "autor"/"tema" string
+        //                    para os arrays "autores"/"temas").
+        // salvar()         - grava no localStorage E, se houver um arquivo
+        //                    vinculado via FSA, grava tambem no biblioteca.txt.
+        // serializarTSV()  - produz a string TSV do catalogo (6 colunas).
+        // parseTSV()       - le uma string TSV e retorna um array de livros.
+        // abrirDB/salvarHandleDB/carregarHandleDB/removerHandleDB -
+        //                    persistencia do file handle em IndexedDB para
+        //                    sobreviver a reloads da pagina.
+        // verificarPermissaoEscrita() / salvarNoArquivo() / vincularArquivo() /
+        // reativarPermissao() / desvincularArquivo() -
+        //                    fluxo da File System Access API.
+        // atualizarBannerSync() - desenha o banner colorido (verde/amarelo/cinza).
+
+        function carregar() {
+            try {
+                const dados = localStorage.getItem(STORAGE_KEY);
+                if (!dados) return [];
+                const lista = JSON.parse(dados);
+                if (!Array.isArray(lista)) return [];
+                return lista.map(normalizarLivro);
+            } catch {
+                return [];
+            }
+        }
+
+        function escaparTSV(valor) {
+            return (valor || "").toString().replace(/\r?\n/g, " | ").replace(/\t/g, " ");
+        }
+
+        function serializarTSV() {
+            return biblioteca.map(l =>
+                [
+                    escaparTSV(l.titulo),
+                    escaparTSV(obterAutores(l).join(SEP_AUTORES + " ")),
+                    escaparTSV(obterTemas(l).join(SEP_AUTORES + " ")),
+                    l.ano,
+                    l.emprestado ? "1" : "0",
+                    escaparTSV(l.comentarios || ""),
+                    escaparTSV(l.local || ""),
+                    (Array.isArray(l.grupoLiteratura) && l.grupoLiteratura.length > 0) ? l.grupoLiteratura.join(";") : "0"
+                ].join("\t")
+            ).join("\n") + "\n";
+        }
+
+        function parseTSV(texto) {
+            const linhas = texto.split(/\r?\n/);
+            const importados = [];
+            for (const linha of linhas) {
+                if (!linha.trim()) continue;
+                const campos = linha.split("\t");
+                // 5 colunas (legado), 6, 7 ou 8 (com grupoLiteratura).
+                if (campos.length < 5 || campos.length > 8) continue;
+                const ano = parseInt(campos[3], 10);
+                if (Number.isNaN(ano)) continue;
+                const autores = campos[1].split(SEP_AUTORES).map(a => a.trim()).filter(a => a.length > 0);
+                const temas = campos[2].split(SEP_AUTORES).map(t => t.trim()).filter(t => t.length > 0);
+                importados.push({
+                    titulo: campos[0],
+                    autores,
+                    temas,
+                    ano,
+                    emprestado: campos[4].trim() === "1",
+                    comentarios: campos.length >= 6 ? campos[5] : "",
+                    local: campos.length >= 7 ? campos[6] : "",
+                    grupoLiteratura: campos.length >= 8 ? parseGruposStr(campos[7]) : []
+                });
+            }
+            return importados.map(normalizarLivro);
+        }
+
+        // === IndexedDB para persistir o file handle entre recargas ===
+        function abrirDB() {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error("IndexedDB timeout")), 3000);
+                const req = indexedDB.open(DB_NAME, 1);
+                req.onupgradeneeded = () => req.result.createObjectStore(STORE_HANDLES);
+                req.onsuccess = () => { clearTimeout(timer); resolve(req.result); };
+                req.onerror  = () => { clearTimeout(timer); reject(req.error); };
+            });
+        }
+
+        async function salvarHandleDB(handle) {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readwrite");
+                tx.objectStore(STORE_HANDLES).put(handle, KEY_HANDLE);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+            } catch (e) { console.warn("Falha ao salvar handle:", e); }
+        }
+
+        async function carregarHandleDB() {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readonly");
+                return await new Promise((res, rej) => {
+                    const req = tx.objectStore(STORE_HANDLES).get(KEY_HANDLE);
+                    req.onsuccess = () => res(req.result || null);
+                    req.onerror = () => rej(req.error);
+                });
+            } catch { return null; }
+        }
+
+        async function removerHandleDB() {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readwrite");
+                tx.objectStore(STORE_HANDLES).delete(KEY_HANDLE);
+            } catch {}
+        }
+
+        // === File System Access API ===
+        async function verificarPermissaoEscrita(handle, solicitar = false) {
+            if (!handle || !handle.queryPermission) return false;
+            const opts = { mode: "readwrite" };
+            const prazo = ms => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
+            try {
+                const qp = await Promise.race([handle.queryPermission(opts), prazo(3000)]);
+                if (qp === "granted") return true;
+                if (solicitar) {
+                    // Aviso em PT antes do prompt nativo do navegador (que aparece em ingles).
+                    toast("O navegador vai pedir permissao para EDITAR o arquivo — clique em \"Save changes\" (Permitir). Isso nao apaga nada.", 6000);
+                    const rp = await Promise.race([handle.requestPermission(opts), prazo(15000)]);
+                    if (rp === "granted") return true;
+                }
+            } catch {}
+            return false;
+        }
+
+        async function salvarNoArquivo() {
+            if (!arquivoHandle) return false;
+            try {
+                if (!(await verificarPermissaoEscrita(arquivoHandle))) {
+                    atualizarBannerSync("pendente");
+                    return false;
+                }
+                const writable = await arquivoHandle.createWritable();
+                await writable.write(serializarTSV());
+                await writable.close();
+                atualizarBannerSync("ok");
+                const ponto = document.querySelector("#sync-banner .ponto");
+                if (ponto) {
+                    ponto.classList.remove("sync-ponto-ativo");
+                    void ponto.offsetWidth; // reinicia a animacao se ja estava rodando
+                    ponto.classList.add("sync-ponto-ativo");
+                    setTimeout(() => ponto.classList.remove("sync-ponto-ativo"), 600);
+                }
+                return true;
+            } catch (e) {
+                console.error("Erro ao gravar arquivo:", e);
+                atualizarBannerSync("pendente");
+                return false;
+            }
+        }
+
+        function atualizarBannerSync(estado) {
+            // Modo nativo macOS: banner fixo mostrando sincronização com iCloud
+            if (window.__BIBLIOTECA_NATIVE__) {
+                const banner = document.getElementById("sync-banner");
+                const msg = document.getElementById("sync-mensagem");
+                if (banner) { banner.className = "sync-banner sync-ok"; }
+                if (msg) { msg.textContent = "Sincronizado com iCloud Drive — alterações salvas automaticamente."; }
+                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                    const b = document.getElementById(id); if (b) b.style.display = "none";
+                });
+                return;
+            }
+
+            const banner = document.getElementById("sync-banner");
+            const msg = document.getElementById("sync-mensagem");
+            const btnVincular = document.getElementById("btn-vincular");
+            const btnDesvincular = document.getElementById("btn-desvincular");
+            const btnRecarregar = document.getElementById("btn-recarregar");
+
+            banner.classList.remove("sync-ok", "sync-pendente", "sync-off");
+
+            if (!SUPORTA_FSA) {
+                banner.classList.add("sync-off");
+                msg.innerHTML = `&#9888;&#65039; <strong>Lembre-se:</strong> antes de iniciar, use <strong>Importar</strong> para carregar a versao atual do <code>biblioteca.txt</code>. Ao terminar, use <strong>Exportar</strong> para salvar as alteracoes.`;
+                btnVincular.style.display = "none";
+                btnDesvincular.style.display = "none";
+                btnRecarregar.style.display = "none";
+                return;
+            }
+
+            if (estado === "ok" && arquivoHandle) {
+                banner.classList.add("sync-ok");
+                const nLivros = biblioteca.length;
+                const plural = nLivros === 1 ? "livro" : "livros";
+                const base = `Sincronizado com <span class="arquivo-info" title="Por seguranca, o navegador nao revela o caminho completo do arquivo.">${escapeHtml(arquivoHandle.name)}</span> · ${nLivros} ${plural}`;
+                msg.innerHTML = `${base} — alteracoes salvas automaticamente.`;
+                btnVincular.style.display = "none";
+                btnDesvincular.style.display = "";
+                btnRecarregar.style.display = "";
+                // Complementa (best-effort) com data e tamanho lidos do proprio arquivo.
+                arquivoHandle.getFile().then(f => {
+                    const dt = new Date(f.lastModified).toLocaleString("pt-BR", {
+                        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
+                    });
+                    const kb = Math.max(1, Math.round(f.size / 1024));
+                    msg.innerHTML = `${base} · atualizado ${dt} · ${kb} KB — alteracoes salvas automaticamente.`;
+                }).catch(() => {});
+            } else if (estado === "pendente" && arquivoHandle) {
+                banner.classList.add("sync-pendente");
+                msg.innerHTML = `Arquivo <span class="arquivo-info">${escapeHtml(arquivoHandle.name)}</span> vinculado, mas a permissao expirou. Clique em <strong>Reativar</strong>.`;
+                btnVincular.textContent = "Reativar permissao";
+                btnVincular.style.display = "";
+                btnDesvincular.style.display = "";
+                btnRecarregar.style.display = "";
+            } else {
+                banner.classList.add("sync-off");
+                msg.innerHTML = `Nenhum arquivo vinculado. As alteracoes ficam apenas no navegador ate voce exportar ou vincular.`;
+                btnVincular.textContent = "Vincular biblioteca.txt";
+                btnVincular.style.display = "";
+                btnDesvincular.style.display = "none";
+                btnRecarregar.style.display = "none";
+            }
+        }
+
+        async function vincularArquivo() {
+            if (!SUPORTA_FSA) {
+                toast("Seu navegador nao suporta vinculacao direta.");
+                return;
+            }
+            try {
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{ description: "Arquivo da biblioteca", accept: { "text/plain": [".txt"] } }],
+                    multiple: false
+                });
+                if (!(await verificarPermissaoEscrita(handle, true))) {
+                    toast("Permissao de escrita negada.");
+                    return;
+                }
+                const tinhaArquivoAntes = (arquivoHandle !== null);
+
+                // Decide a acao ANTES de trocar o arquivo vinculado, para nunca
+                // sobrescrever por engano o arquivo recem-escolhido.
+                let acao;                   // "carregar" | "gravar-memoria" | "cancelar"
+                let importadosCache = null; // livros lidos do arquivo escolhido (evita reler)
+                if (biblioteca.length === 0) {
+                    acao = "carregar";
+                } else {
+                    // Ha livros na memoria: le o arquivo escolhido para comparar as contagens.
+                    let nArquivo = null;
+                    try {
+                        const f = await handle.getFile();
+                        importadosCache = parseTSV(await f.text());
+                        nArquivo = importadosCache.length;
+                    } catch (e) { importadosCache = null; nArquivo = null; }
+                    const nMemoria = biblioteca.length;
+                    const doArquivo = (nArquivo !== null) ? `${nArquivo}` : "?";
+
+                    if (tinhaArquivoAntes) {
+                        // Troca de arquivo: a lista atual ja esta salva no arquivo anterior.
+                        acao = confirm(
+                            "Trocar para este arquivo?\n\n" +
+                            `O arquivo escolhido tem ${doArquivo} livro(s); a lista exibida sera substituida por ele.\n` +
+                            "Suas alteracoes atuais ja estao salvas no arquivo anterior."
+                        ) ? "carregar" : "cancelar";
+                    } else {
+                        // 1a vinculacao: ha livros na memoria e nunca houve arquivo.
+                        acao = confirm(
+                            `O arquivo escolhido tem ${doArquivo} livro(s). A lista atual na memoria tem ${nMemoria}.\n\n` +
+                            `OK = USAR o arquivo (${doArquivo}) e descartar a lista da memoria.\n` +
+                            `Cancelar = GRAVAR sua lista (${nMemoria}) POR CIMA do arquivo, substituindo o conteudo dele.`
+                        ) ? "carregar" : "gravar-memoria";
+                    }
+                }
+
+                if (acao === "cancelar") {
+                    toast("Troca cancelada. Arquivo anterior mantido.");
+                    return;
+                }
+
+                arquivoHandle = handle;
+                await salvarHandleDB(handle);
+
+                if (acao === "carregar") {
+                    try {
+                        let importados = importadosCache;
+                        if (importados === null) {
+                            const file = await handle.getFile();
+                            importados = parseTSV(await file.text());
+                        }
+                        biblioteca = importados;
+                        salvar();
+                        atualizarTudo();
+                        toast(`${importados.length} livro(s) carregado(s) do arquivo.`);
+                    } catch (e) {
+                        toast("Erro ao ler o arquivo vinculado.");
+                    }
+                } else { // "gravar-memoria" — so na 1a vinculacao
+                    await salvarNoArquivo();
+                    toast("Arquivo vinculado. Lista atual gravada nele.");
+                }
+
+                atualizarBannerSync("ok");
+            } catch (e) {
+                if (e.name === "AbortError") return;
+                if (e.name === "SecurityError") {
+                    toast("Seu navegador nao permite selecionar arquivo neste contexto. Use Importar para carregar o arquivo.", 5000);
+                    return;
+                }
+                console.error(e);
+                toast("Erro ao vincular arquivo.");
+            }
+        }
+
+        async function reativarPermissao() {
+            if (!arquivoHandle) { vincularArquivo(); return; }
+            if (await verificarPermissaoEscrita(arquivoHandle, true)) {
+                try {
+                    const file = await arquivoHandle.getFile();
+                    const importados = parseTSV(await file.text());
+                    biblioteca = importados;
+                    salvar();
+                    paginaAtual = 1;
+                    atualizarTudo();
+                    atualizarBannerSync("ok");
+                    toast(`Permissao reativada — ${importados.length} livro(s) carregado(s) do arquivo.`, 3500);
+                } catch {
+                    atualizarBannerSync("ok");
+                    toast("Permissao reativada.");
+                }
+            } else {
+                toast("Permissao nao concedida.");
+            }
+        }
+
+        async function desvincularArquivo() {
+            arquivoHandle = null;
+            await removerHandleDB();
+            atualizarBannerSync("desvinculado");
+            toast("Arquivo desvinculado.");
+        }
+
+        async function recarregarDoArquivo() {
+            if (!arquivoHandle) {
+                toast("Nenhum arquivo vinculado para recarregar.");
+                return;
+            }
+            try {
+                const file = await arquivoHandle.getFile();
+                const importados = parseTSV(await file.text());
+                biblioteca = importados;
+                salvar();
+                paginaAtual = 1;
+                atualizarTudo();
+                atualizarBannerSync("ok");
+                toast(`${importados.length} livro(s) recarregado(s) do arquivo.`);
+            } catch (e) {
+                toast("Erro ao recarregar o arquivo.");
+            }
+        }
+
+        function salvar() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+            if (arquivoHandle) {
+                salvarNoArquivo();
+            }
+            // Modo nativo macOS (WKWebView): envia TSV e fotos ao Swift que grava no iCloud
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.exportar.postMessage(serializarTSV()); } catch(_) {}
+                try { window.webkit.messageHandlers.fotos.postMessage(JSON.stringify(fotos)); } catch(_) {}
+            }
+        }
+
+        function toast(mensagem, duracao = 2200) {
+            const el = document.getElementById("toast");
+            el.textContent = mensagem;
+            el.classList.add("show");
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => el.classList.remove("show"), duracao);
+        }
+
+        function aplicarFiltros() {
+            const t = normalizar(document.getElementById("filtro-titulo").value);
+            const a = normalizar(document.getElementById("filtro-autor").value);
+            const tm = normalizar(document.getElementById("filtro-tema").value);
+            const lc = normalizar(document.getElementById("filtro-local").value);
+            const status = document.getElementById("filtro-status").value;
+            const filtroGrupo = document.getElementById("filtro-grupo").value;
+
+            return biblioteca
+                .map((livro, indice) => ({ livro, indice }))
+                .filter(({ livro }) => {
+                    if (t && !normalizar(livro.titulo).includes(t)) return false;
+                    if (a && !obterAutores(livro).some(au => normalizar(au).includes(a))) return false;
+                    if (tm && !obterTemas(livro).some(te => normalizar(te).includes(tm))) return false;
+                    if (lc && !normalizar(livro.local || "").includes(lc)) return false;
+                    if (status === "disponivel" && livro.emprestado) return false;
+                    if (status === "emprestado" && !livro.emprestado) return false;
+                    if (filtroGrupo === "qualquer" && (!Array.isArray(livro.grupoLiteratura) || livro.grupoLiteratura.length === 0)) return false;
+                    if (filtroGrupo && filtroGrupo !== "qualquer") {
+                        const id = parseInt(filtroGrupo, 10);
+                        if (!Array.isArray(livro.grupoLiteratura) || !livro.grupoLiteratura.includes(id)) return false;
+                    }
+                    return true;
+                });
+        }
+
+        function gerarControlesPaginacao(totalPaginas, totalItens, inicio, fim) {
+            if (totalPaginas <= 1) {
+                return `<div class="paginacao"><span class="info">Mostrando ${totalItens} livro(s)</span></div>`;
+            }
+
+            const paginas = new Set([1, totalPaginas, paginaAtual]);
+            for (let i = paginaAtual - 1; i <= paginaAtual + 1; i++) {
+                if (i >= 1 && i <= totalPaginas) paginas.add(i);
+            }
+            const lista = [...paginas].sort((a, b) => a - b);
+
+            let html = "";
+            html += `<button data-pagina="${paginaAtual - 1}" ${paginaAtual === 1 ? "disabled" : ""}>&laquo; Anterior</button>`;
+
+            let anterior = 0;
+            for (const p of lista) {
+                if (p - anterior > 1) html += `<span class="reticencias">...</span>`;
+                html += `<button data-pagina="${p}" class="${p === paginaAtual ? "ativa" : ""}">${p}</button>`;
+                anterior = p;
+            }
+
+            html += `<button data-pagina="${paginaAtual + 1}" ${paginaAtual === totalPaginas ? "disabled" : ""}>Proxima &raquo;</button>`;
+            html += `<span class="info">Mostrando ${inicio}-${fim} de ${totalItens}</span>`;
+
+            return `<div class="paginacao">${html}</div>`;
+        }
+
+        function chaveAutoresParaSort(livro) {
+            return obterAutores(livro).map(normalizarComparacao).sort().join("|");
+        }
+
+        function renderizar() {
+            const filtrados = aplicarFiltros();
+            const container = document.getElementById("tabela-container");
+            const contador = document.getElementById("contador");
+
+            contador.textContent = `${filtrados.length} de ${biblioteca.length} livro(s)`;
+
+            if (filtrados.length === 0) {
+                container.innerHTML = `<div class="empty">${biblioteca.length === 0 ? "Nenhum livro cadastrado." : "Nenhum livro corresponde aos filtros."}</div>`;
+                return;
+            }
+
+            // Ordena de forma que livros com o MESMO conjunto de autores fiquem
+            // contiguos; dentro do grupo, ordena por titulo. Livros sem autor
+            // vao para o final.
+            filtrados.sort((a, b) => {
+                const chaveA = chaveAutoresParaSort(a.livro);
+                const chaveB = chaveAutoresParaSort(b.livro);
+                if (chaveA === "" && chaveB !== "") return 1;
+                if (chaveB === "" && chaveA !== "") return -1;
+                if (chaveA !== chaveB) return chaveA.localeCompare(chaveB, "pt-BR");
+                return a.livro.titulo.localeCompare(b.livro.titulo, "pt-BR");
+            });
+
+            const totalPaginas = Math.max(1, Math.ceil(filtrados.length / LIVROS_POR_PAGINA));
+            if (paginaAtual > totalPaginas) paginaAtual = totalPaginas;
+            if (paginaAtual < 1) paginaAtual = 1;
+
+            const inicioIdx = (paginaAtual - 1) * LIVROS_POR_PAGINA;
+            const fimIdx = Math.min(inicioIdx + LIVROS_POR_PAGINA, filtrados.length);
+            const pagina = filtrados.slice(inicioIdx, fimIdx);
+
+            let chaveGrupoAnterior = null;
+            const linhas = pagina.map(({ livro, indice }) => {
+                const comentario = (livro.comentarios || "").trim();
+                const cellComentario = comentario
+                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${escapeHtml(comentario)}</div></td>`
+                    : `<td class="cell-comentario vazio">—</td>`;
+                const local = (livro.local || "").trim();
+                const cellLocal = local
+                    ? `<td>${escapeHtml(local)}</td>`
+                    : `<td class="cell-comentario vazio">—</td>`;
+                const chaveAtual = chaveAutoresParaSort(livro);
+                const classeGrupo = chaveAtual !== chaveGrupoAnterior ? "grupo-inicio" : "";
+                chaveGrupoAnterior = chaveAtual;
+                const nomesG = nomeGrupos(livro);
+                const cellGrupo = nomesG
+                    ? `<td style="font-size:12px;color:#166b48;" title="${escapeHtml(nomesG)}">&#10003; ${escapeHtml(nomesG)}</td>`
+                    : `<td style="text-align:center;color:#cbd2dc;">—</td>`;
+                const fotoSrc = livro.id ? fotos[livro.id] : null;
+                const cellFoto = fotoSrc
+                    ? `<td style="text-align:center;padding:4px 2px;"><img src="${fotoSrc}" class="thumb-mini" onclick="abrirEdicao(${indice})" title="Clique para editar"></td>`
+                    : `<td style="text-align:center;padding:4px 2px;"><div onclick="abrirEdicao(${indice})" title="Sem foto — clique para adicionar" style="width:44px;height:44px;border-radius:6px;border:1.5px dashed #c8d5ea;background:#f4f6f9;display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0 auto;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="#2B5FB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="#2B5FB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/></svg></div></td>`;
+                return `
+                <tr class="${classeGrupo}">
+                    ${cellFoto}
+                    <td>${escapeHtml(livro.titulo)}</td>
+                    <td>${escapeHtml(autoresParaTexto(livro))}</td>
+                    <td>${escapeHtml(temasParaTexto(livro))}</td>
+                    <td>${livro.ano}</td>
+                    <td>
+                        <span class="status-pill ${livro.emprestado ? "status-emprestado" : "status-disponivel"}">
+                            ${livro.emprestado ? "Emprestado" : "Disponivel"}
+                        </span>
+                    </td>
+                    ${cellLocal}
+                    ${cellComentario}
+                    ${cellGrupo}
+                    <td>
+                        <div class="actions">
+                            <button class="btn-ghost btn-small" data-action="editar" data-indice="${indice}">Editar</button>
+                            ${livro.emprestado
+                                ? `<button class="btn-accent btn-small" data-action="devolver" data-indice="${indice}">Devolver</button>`
+                                : `<button class="btn-primary btn-small" data-action="emprestar" data-indice="${indice}">Emprestar</button>`}
+                            <button class="btn-ghost btn-small" data-action="imprimir" data-indice="${indice}">Imprimir</button>
+                            <button class="btn-danger btn-small" data-action="remover" data-indice="${indice}">Remover</button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join("");
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:52px;text-align:center;">Foto</th>
+                            <th>Titulo</th>
+                            <th>Autor</th>
+                            <th>Tema</th>
+                            <th>Ano</th>
+                            <th>Status</th>
+                            <th>Local</th>
+                            <th>Comentario</th>
+                            <th style="text-align:center;" title="Grupo de Literatura">Grupo</th>
+                            <th>Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>${linhas}</tbody>
+                </table>
+                ${gerarControlesPaginacao(totalPaginas, filtrados.length, inicioIdx + 1, fimIdx)}
+            `;
+        }
+
+        function renderizarCategorias() {
+            const temas = new Map();
+            const autores = new Map();
+
+            for (const livro of biblioteca) {
+                for (const tema of obterTemas(livro)) {
+                    const chave = normalizar(tema);
+                    const atual = temas.get(chave) || { rotulo: tema, total: 0 };
+                    atual.total++;
+                    temas.set(chave, atual);
+                }
+                for (const autor of obterAutores(livro)) {
+                    const chave = normalizar(autor);
+                    const atual = autores.get(chave) || { rotulo: autor, total: 0 };
+                    atual.total++;
+                    autores.set(chave, atual);
+                }
+            }
+
+            const ordenar = (mapa) => [...mapa.values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"));
+            const temasOrd = ordenar(temas);
+            const autoresOrd = ordenar(autores);
+
+            const contadorCat = document.getElementById("contador-categorias");
+            contadorCat.textContent = `${temasOrd.length} tema(s), ${autoresOrd.length} autor(es)`;
+
+            const listaTemas = document.getElementById("lista-temas");
+            const listaAutores = document.getElementById("lista-autores");
+
+            const filtroTema  = normalizar(document.getElementById("filtro-chip-tema").value);
+            const filtroAutor = normalizar(document.getElementById("filtro-chip-autor").value);
+            const temasFilt   = filtroTema  ? temasOrd.filter(t  => normalizar(t.rotulo).includes(filtroTema))  : temasOrd;
+            const autoresFilt = filtroAutor ? autoresOrd.filter(a => normalizar(a.rotulo).includes(filtroAutor)) : autoresOrd;
+
+            listaTemas.innerHTML = temasFilt.length === 0
+                ? `<span style="color: var(--muted); font-size: 13px;">Nenhum tema encontrado.</span>`
+                : temasFilt.map(t => `<span class="chip" data-tipo="tema" data-valor="${escapeHtml(t.rotulo)}">${escapeHtml(t.rotulo)}<span class="contagem">${t.total}</span></span>`).join("");
+
+            listaAutores.innerHTML = autoresFilt.length === 0
+                ? `<span style="color: var(--muted); font-size: 13px;">Nenhum autor encontrado.</span>`
+                : autoresFilt.map(a => `<span class="chip chip-autor" data-tipo="autor" data-valor="${escapeHtml(a.rotulo)}">${escapeHtml(a.rotulo)}<span class="contagem">${a.total}</span></span>`).join("");
+        }
+
+        function renderizarSeletorEdicao() {
+            const filtro = normalizar(document.getElementById("edit-busca").value);
+            const seletor = document.getElementById("edit-seletor");
+
+            const itens = biblioteca
+                .map((livro, indice) => ({ livro, indice }))
+                .filter(({ livro }) => {
+                    if (!filtro) return true;
+                    return normalizar(livro.titulo).includes(filtro)
+                        || obterAutores(livro).some(au => normalizar(au).includes(filtro))
+                        || obterTemas(livro).some(te => normalizar(te).includes(filtro))
+                        || normalizar(livro.local || "").includes(filtro);
+                })
+                .sort((a, b) => a.livro.titulo.localeCompare(b.livro.titulo, "pt-BR"));
+
+            if (itens.length === 0) {
+                seletor.innerHTML = `<option value="">Nenhum livro encontrado</option>`;
+                seletor.disabled = true;
+                return;
+            }
+
+            seletor.disabled = false;
+            seletor.innerHTML = itens.map(({ livro, indice }) =>
+                `<option value="${indice}">${escapeHtml(livro.titulo)} — ${escapeHtml(autoresParaTexto(livro))} (${livro.ano})</option>`
+            ).join("");
+        }
+
+        async function buscarPorISBN() {
+            const isbn = document.getElementById("isbn-input").value.replace(/[-\s]/g, "");
+            const status = document.getElementById("isbn-status");
+            if (!/^\d{10}(\d{3})?$/.test(isbn)) {
+                status.textContent = "ISBN inválido.";
+                status.style.color = "#c0392b";
+                return;
+            }
+            status.textContent = "Buscando…";
+            status.style.color = "var(--muted)";
+            try {
+                // Tentativa 1: Brasil API — agrega CBL, Mercado Editorial, Google Books e Open Library.
+                // Melhor cobertura para livros brasileiros (prefixos 978-85 e 978-65).
+                const respBR = await fetch(`https://brasilapi.com.br/api/isbn/v1/${isbn}`);
+                if (respBR.ok) {
+                    const dataBR = await respBR.json();
+                    if (dataBR.title) {
+                        document.getElementById("titulo").value = dataBR.title;
+                        if (dataBR.year)            document.getElementById("ano").value = dataBR.year;
+                        if (dataBR.authors?.length) popularCampos("autores-container", dataBR.authors, "autor");
+                        if (dataBR.subjects?.length) popularCampos("temas-container", dataBR.subjects.slice(0, 3), "tema");
+                        const extras = [];
+                        if (dataBR.subtitle)  extras.push(dataBR.subtitle);
+                        if (dataBR.publisher) extras.push("Editora: " + dataBR.publisher);
+                        if (extras.length)    document.getElementById("comentarios").value = extras.join(" | ");
+                        const fonte = dataBR.provider || "CBL";
+                        status.textContent = `Campos preenchidos (Brasil API · ${fonte}).`;
+                        status.style.color = "green";
+                        return;
+                    }
+                }
+                // Tentativa 2: Google Books
+                status.textContent = "Tentando Google Books…";
+                const respGB = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+                if (respGB.ok) {
+                    const dataGB = await respGB.json();
+                    const info = dataGB.items?.[0]?.volumeInfo;
+                    if (info) {
+                        if (info.title)              document.getElementById("titulo").value = info.title;
+                        if (info.publishedDate)      { const m = info.publishedDate.match(/\d{4}/); if (m) document.getElementById("ano").value = m[0]; }
+                        if (info.authors?.length)    popularCampos("autores-container", info.authors, "autor");
+                        if (info.categories?.length) popularCampos("temas-container", info.categories.slice(0, 3), "tema");
+                        if (info.publisher)          document.getElementById("comentarios").value = "Editora: " + info.publisher;
+                        status.textContent = "Campos preenchidos (Google Books).";
+                        status.style.color = "green";
+                        return;
+                    }
+                }
+                // Tentativa 3: Open Library
+                status.textContent = "Tentando Open Library…";
+                const respOL = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+                if (respOL.ok) {
+                    const dataOL = await respOL.json();
+                    const livroOL = dataOL[`ISBN:${isbn}`];
+                    if (livroOL) {
+                        if (livroOL.title)        document.getElementById("titulo").value = livroOL.title;
+                        if (livroOL.publish_date) { const m = livroOL.publish_date.match(/\d{4}/); if (m) document.getElementById("ano").value = m[0]; }
+                        if (livroOL.authors?.length)     popularCampos("autores-container", livroOL.authors.map(a => a.name), "autor");
+                        if (livroOL.subjects?.length)    popularCampos("temas-container", livroOL.subjects.slice(0, 3).map(s => s.name), "tema");
+                        if (livroOL.publishers?.length)  document.getElementById("comentarios").value = "Editora: " + livroOL.publishers.map(p => p.name).join(", ");
+                        status.textContent = "Campos preenchidos (Open Library).";
+                        status.style.color = "green";
+                        return;
+                    }
+                }
+                status.textContent = "ISBN não encontrado em nenhuma base de dados.";
+                status.style.color = "#c0392b";
+            } catch {
+                status.textContent = "Erro ao buscar. Verifique a conexão com a internet.";
+                status.style.color = "#c0392b";
+            }
+        }
+
+        function atualizarDataLists() {
+            for (const id of ["datalist-autores", "datalist-temas"]) {
+                if (!document.getElementById(id)) {
+                    const dl = document.createElement("datalist");
+                    dl.id = id;
+                    document.body.appendChild(dl);
+                }
+            }
+            const autoresUnicos = [...new Set(biblioteca.flatMap(l => obterAutores(l)))].sort((a, b) => a.localeCompare(b, "pt"));
+            const temasUnicos   = [...new Set(biblioteca.flatMap(l => obterTemas(l)))].sort((a, b) => a.localeCompare(b, "pt"));
+            document.getElementById("datalist-autores").innerHTML = autoresUnicos.map(a => `<option value="${escapeHtml(a)}">`).join("");
+            document.getElementById("datalist-temas").innerHTML   = temasUnicos.map(t => `<option value="${escapeHtml(t)}">`).join("");
+        }
+
+        function atualizarTudo() {
+            atualizarFiltroGrupo();
+            renderizar();
+            renderizarCategorias();
+            renderizarSeletorEdicao();
+            atualizarDataLists();
+        }
+
+        // =====================================================================
+        // GRUPOS DE LITERATURA
+        // =====================================================================
+
+        function parseGruposStr(str) {
+            if (!str || str.trim() === "0" || str.trim() === "") return [];
+            return str.split(";").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n) && n > 0);
+        }
+
+        function carregarGrupos() {
+            try {
+                const raw = localStorage.getItem(GRUPOS_KEY);
+                if (raw) grupos = JSON.parse(raw);
+            } catch(e) { grupos = []; }
+            if (!grupos.find(g => g.id === 1)) {
+                grupos.unshift({ id: 1, nome: "Grupo de Literatura" });
+                salvarGrupos();
+            }
+        }
+
+        function salvarGrupos() {
+            localStorage.setItem(GRUPOS_KEY, JSON.stringify(grupos));
+        }
+
+        function proximoIdGrupo() {
+            return grupos.length > 0 ? Math.max(...grupos.map(g => g.id)) + 1 : 2;
+        }
+
+        function nomeGrupos(livro) {
+            if (!Array.isArray(livro.grupoLiteratura) || livro.grupoLiteratura.length === 0) return null;
+            return livro.grupoLiteratura.map(id => {
+                const g = grupos.find(x => x.id === id);
+                return g ? g.nome : `Grupo ${id}`;
+            }).join(", ");
+        }
+
+        function atualizarFiltroGrupo() {
+            const sel = document.getElementById("filtro-grupo");
+            if (!sel) return;
+            const val = sel.value;
+            sel.innerHTML = `<option value="">Todos os livros</option><option value="qualquer">Qualquer grupo</option>`
+                + grupos.map(g => `<option value="${g.id}">${escapeHtml(g.nome)}</option>`).join("");
+            if ([...sel.options].some(o => o.value === val)) sel.value = val;
+        }
+
+        function preencherCheckboxesGrupo(containerId, selecionados) {
+            const div = document.getElementById(containerId);
+            if (!div) return;
+            div.innerHTML = grupos.map(g => `
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
+                    <input type="checkbox" name="${containerId}-item" value="${g.id}"
+                        style="width:auto;cursor:pointer;" ${selecionados.includes(g.id) ? "checked" : ""}>
+                    ${escapeHtml(g.nome)}
+                </label>`).join("");
+        }
+
+        function lerGruposSelecionados(containerId) {
+            return [...document.querySelectorAll(`#${containerId} input[type=checkbox]:checked`)]
+                .map(cb => parseInt(cb.value, 10));
+        }
+
+        function abrirModalGrupos() {
+            renderListaGruposModal();
+            document.getElementById("modal-grupos").style.display = "flex";
+        }
+
+        function renderListaGruposModal() {
+            const div = document.getElementById("lista-grupos-modal");
+            div.innerHTML = grupos.map(g => {
+                const usos = biblioteca.filter(l => Array.isArray(l.grupoLiteratura) && l.grupoLiteratura.includes(g.id)).length;
+                return `
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="text" value="${escapeHtml(g.nome)}" data-gid="${g.id}"
+                        style="flex:1;padding:6px 8px;border:1px solid #c8d5ea;border-radius:6px;font-size:13px;">
+                    <span style="font-size:11px;color:#888;white-space:nowrap;">${usos} livro(s)</span>
+                    ${g.id !== 1 ? `<button type="button" data-remover-grupo="${g.id}"
+                        style="background:none;border:none;color:#c0392b;cursor:pointer;font-size:18px;line-height:1;" title="Remover">&#10005;</button>` : `<span style="width:22px;"></span>`}
+                </div>`;
+            }).join("");
+        }
+
+        document.getElementById("lista-grupos-modal").addEventListener("change", (e) => {
+            const input = e.target.closest("input[data-gid]");
+            if (!input) return;
+            const id = parseInt(input.dataset.gid, 10);
+            const g = grupos.find(x => x.id === id);
+            if (g) { g.nome = input.value.trim() || g.nome; salvarGrupos(); atualizarFiltroGrupo(); }
+        });
+
+        document.getElementById("lista-grupos-modal").addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-remover-grupo]");
+            if (!btn) return;
+            const id = parseInt(btn.dataset.removerGrupo, 10);
+            const usos = biblioteca.filter(l => Array.isArray(l.grupoLiteratura) && l.grupoLiteratura.includes(id)).length;
+            if (usos > 0 && !confirm(`Este grupo esta atribuido a ${usos} livro(s). Remover mesmo assim?`)) return;
+            grupos = grupos.filter(g => g.id !== id);
+            biblioteca.forEach(l => {
+                if (Array.isArray(l.grupoLiteratura)) l.grupoLiteratura = l.grupoLiteratura.filter(x => x !== id);
+            });
+            salvarGrupos();
+            salvar();
+            renderListaGruposModal();
+            atualizarFiltroGrupo();
+        });
+
+        document.getElementById("btn-adicionar-grupo").addEventListener("click", () => {
+            const id = proximoIdGrupo();
+            grupos.push({ id, nome: `Grupo ${id}` });
+            salvarGrupos();
+            renderListaGruposModal();
+        });
+
+        document.getElementById("btn-fechar-modal-grupos").addEventListener("click", () => {
+            document.getElementById("modal-grupos").style.display = "none";
+            preencherCheckboxesGrupo("grupo-checkboxes",
+                document.getElementById("grupo-participa").checked
+                    ? lerGruposSelecionados("grupo-checkboxes") : []);
+        });
+
+        document.getElementById("btn-gerenciar-grupos-cadastro").addEventListener("click", abrirModalGrupos);
+        document.getElementById("btn-gerenciar-grupos-edicao").addEventListener("click", abrirModalGrupos);
+
+        document.getElementById("grupo-participa").addEventListener("change", function() {
+            const multi = document.getElementById("grupo-multi");
+            multi.style.display = this.checked ? "" : "none";
+            if (this.checked) preencherCheckboxesGrupo("grupo-checkboxes", []);
+        });
+
+        document.getElementById("edit-grupo-participa").addEventListener("change", function() {
+            const multi = document.getElementById("edit-grupo-multi");
+            multi.style.display = this.checked ? "" : "none";
+            if (this.checked) preencherCheckboxesGrupo("edit-grupo-checkboxes", []);
+        });
+
+        // =====================================================================
+        // RENDERIZACAO DA INTERFACE
+        // =====================================================================
+        // aplicarFiltros()             - aplica os filtros de pesquisa atuais
+        //                                e retorna o subconjunto a exibir.
+        // chaveAutoresParaSort()       - chave usada para agrupar livros pelo
+        //                                MESMO conjunto de autores na listagem.
+        // gerarControlesPaginacao()    - HTML dos botoes de paginacao.
+        // renderizar()                 - reconstroi a tabela principal:
+        //                                aplica filtros, ordena por autores,
+        //                                pagina e marca o inicio de cada grupo.
+        // renderizarCategorias()       - chips de temas e autores cadastrados.
+        // renderizarSeletorEdicao()    - dropdown de "Editar livro" filtrado.
+        // atualizarTudo()              - chama as 3 anteriores juntas (usar
+        //                                sempre que biblioteca mudar).
+        // escapeHtml() / criarLinhaCampo / popularCampos / lerCampos -
+        //                                helpers para formularios dinamicos
+        //                                de autores e temas multiplos.
+
+        function escapeHtml(texto) {
+            return (texto || "").toString().replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+            }[c]));
+        }
+
+        const TIPOS_CAMPO = {
+            autor: { rowClass: "autor-row", inputClass: "autor-input", btnClass: "btn-remover-autor", placeholder: "Nome do autor" },
+            tema:  { rowClass: "tema-row",  inputClass: "tema-input",  btnClass: "btn-remover-tema",  placeholder: "Tema do livro" }
+        };
+
+        function criarLinhaCampo(valor, containerId, tipo) {
+            const cfg = TIPOS_CAMPO[tipo];
+            const div = document.createElement("div");
+            div.className = cfg.rowClass;
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = cfg.inputClass;
+            input.placeholder = cfg.placeholder;
+            input.value = valor || "";
+            input.setAttribute("list", tipo === "autor" ? "datalist-autores" : "datalist-temas");
+            const botao = document.createElement("button");
+            botao.type = "button";
+            botao.className = cfg.btnClass;
+            botao.title = "Remover";
+            botao.innerHTML = "&times;";
+            botao.addEventListener("click", () => {
+                const container = document.getElementById(containerId);
+                if (container.querySelectorAll("." + cfg.rowClass).length > 1) {
+                    div.remove();
+                } else {
+                    input.value = "";
+                    input.focus();
+                }
+            });
+            div.appendChild(input);
+            div.appendChild(botao);
+            return div;
+        }
+
+        function popularCampos(containerId, valores, tipo) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            const lista = (valores && valores.length > 0) ? valores : [""];
+            for (const v of lista) {
+                container.appendChild(criarLinhaCampo(v, containerId, tipo));
+            }
+        }
+
+        function lerCampos(containerId, tipo) {
+            const cfg = TIPOS_CAMPO[tipo];
+            return Array.from(document.querySelectorAll(`#${containerId} .${cfg.inputClass}`))
+                .map(input => input.value.trim())
+                .filter(v => v.length > 0);
+        }
+
+        // === Cadastro ===
+        // =====================================================================
+        // HANDLERS DE INTERACAO DO USUARIO
+        // =====================================================================
+        // A partir daqui amarramos os botoes/formularios aos respectivos
+        // handlers. Cada bloco corresponde a uma area visivel da interface:
+        //   - submit do formulario de cadastro (com deteccao de duplicatas)
+        //   - acoes na tabela (editar/emprestar/devolver/imprimir/remover)
+        //   - modal de edicao (com check de duplicatas se a "identidade" mudou)
+        //   - filtros e pesquisa (botao + Enter)
+        //   - botoes Importar / Exportar / Apagar / Encerrar
+        //   - botoes de Vincular / Reativar / Desvincular do arquivo
+        //   - botoes de backup / restauracao de JSON
+        //   - botoes "+ Adicionar autor/tema" e persistencia do estado
+        //     aberto/fechado da secao "Temas e Autores cadastrados".
+        //
+        // No final do script, uma IIFE async inicializa a sincronizacao:
+        // tenta restaurar o file handle do IndexedDB e ajusta o banner.
+
+        atualizarTudo();
+
+        document.getElementById("form-cadastro").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const autores = lerCampos("autores-container", "autor");
+            const temas = lerCampos("temas-container", "tema");
+            const titulo = document.getElementById("titulo").value.trim();
+            const ano = parseInt(document.getElementById("ano").value, 10);
+            const comentarios = document.getElementById("comentarios").value.trim();
+            const local = document.getElementById("local").value.trim();
+
+            if (!titulo || autores.length === 0 || temas.length === 0 || Number.isNaN(ano)) {
+                toast("Preencha todos os campos (pelo menos um autor e um tema).");
+                return;
+            }
+
+            const { exatos, similares } = encontrarDuplicados(titulo, autores);
+            if (exatos.length > 0) {
+                const d = exatos[0].livro;
+                alert(`Cadastro recusado: ja existe um livro identico.\n\n` +
+                      `Titulo: ${d.titulo}\nAutor(es): ${autoresParaTexto(d)}\nAno: ${d.ano}`);
+                return;
+            }
+            if (similares.length > 0) {
+                const lista = similares.slice(0, 5).map(s =>
+                    `  • "${s.livro.titulo}" — ${autoresParaTexto(s.livro)} (${s.livro.ano}) [${s.simTitulo}% similar]`
+                ).join("\n");
+                const mais = similares.length > 5 ? `\n  ... e mais ${similares.length - 5}` : "";
+                if (!confirm(`Atencao: encontramos ${similares.length} livro(s) parecido(s):\n\n${lista}${mais}\n\nCadastrar mesmo assim?`)) {
+                    return;
+                }
+            }
+
+            const participa = document.getElementById("grupo-participa").checked;
+            const grupoLiteratura = participa ? lerGruposSelecionados("grupo-checkboxes") : [];
+            const livro = { titulo, autores, temas, ano, emprestado: false, comentarios, local, grupoLiteratura };
+            normalizarLivro(livro);
+            if (_fotoPendenteCadastro) { fotos[livro.id] = _fotoPendenteCadastro; }
+            biblioteca.push(livro);
+            salvar();
+            paginaAtual = Math.ceil(biblioteca.length / LIVROS_POR_PAGINA);
+            atualizarTudo();
+            e.target.reset();
+            resetarFotoCadastro();
+            document.getElementById("grupo-participa").checked = false;
+            document.getElementById("grupo-multi").style.display = "none";
+            popularCampos("autores-container", [], "autor");
+            popularCampos("temas-container", [], "tema");
+            toast("Livro cadastrado com sucesso.");
+        });
+
+        document.getElementById("btn-buscar-isbn").addEventListener("click", buscarPorISBN);
+
+        document.getElementById("btn-limpar-cadastro").addEventListener("click", () => {
+            document.getElementById("form-cadastro").reset();
+            resetarFotoCadastro();
+            document.getElementById("grupo-participa").checked = false;
+            document.getElementById("grupo-multi").style.display = "none";
+            popularCampos("autores-container", [], "autor");
+            popularCampos("temas-container", [], "tema");
+        });
+
+        // === Fotos ===
+        document.getElementById("foto-cadastro-input").addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const dataUrl = await redimensionarImagem(file, 200);
+            if (!dataUrl) { toast("Erro ao processar a imagem."); return; }
+            _fotoPendenteCadastro = dataUrl;
+            const img = document.getElementById("foto-cadastro-img");
+            const ph = document.getElementById("foto-cadastro-placeholder");
+            img.src = dataUrl;
+            img.style.display = "";
+            ph.style.display = "none";
+            document.getElementById("btn-foto-cadastro-remover").style.display = "";
+        });
+
+        document.getElementById("btn-foto-cadastro-remover").addEventListener("click", () => {
+            resetarFotoCadastro();
+        });
+
+        document.getElementById("edit-foto-input").addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const dataUrl = await redimensionarImagem(file, 200);
+            if (!dataUrl) { toast("Erro ao processar a imagem."); return; }
+            _fotoPendenteEdicao = dataUrl;
+            _fotoRemovidaEdicao = false;
+            const img = document.getElementById("edit-foto-img");
+            const ph = document.getElementById("edit-foto-placeholder");
+            img.src = dataUrl;
+            img.style.display = "";
+            ph.style.display = "none";
+            document.getElementById("btn-edit-foto-remover").style.display = "";
+        });
+
+        document.getElementById("btn-edit-foto-remover").addEventListener("click", () => {
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = true;
+            const img = document.getElementById("edit-foto-img");
+            const ph = document.getElementById("edit-foto-placeholder");
+            img.src = "";
+            img.style.display = "none";
+            ph.style.display = "";
+            document.getElementById("btn-edit-foto-remover").style.display = "none";
+            document.getElementById("edit-foto-input").value = "";
+        });
+
+        // === Filtros ===
+        function executarPesquisa() {
+            paginaAtual = 1;
+            const resultados = aplicarFiltros();
+            renderizar();
+            const temFiltro = ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].some(id => document.getElementById(id).value.trim())
+                || document.getElementById("filtro-status").value !== "todos";
+            if (temFiltro) {
+                toast(`${resultados.length} livro(s) encontrado(s).`);
+            }
+        }
+
+        document.getElementById("btn-pesquisar").addEventListener("click", executarPesquisa);
+
+        ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    executarPesquisa();
+                }
+            });
+            el.addEventListener("input", () => {
+                paginaAtual = 1;
+                renderizar();
+            });
+        });
+
+        document.getElementById("filtro-status").addEventListener("change", executarPesquisa);
+
+        ["filtro-chip-tema", "filtro-chip-autor"].forEach(id => {
+            document.getElementById(id).addEventListener("input", renderizarCategorias);
+        });
+
+        document.getElementById("btn-limpar-filtros").addEventListener("click", () => {
+            ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].forEach(id => document.getElementById(id).value = "");
+            document.getElementById("filtro-status").value = "todos";
+            document.getElementById("filtro-grupo").value = "";
+            paginaAtual = 1;
+            renderizar();
+        });
+
+        // === Clique nos chips de tema/autor ===
+        document.getElementById("categorias-details").addEventListener("click", (e) => {
+            const chip = e.target.closest(".chip[data-tipo]");
+            if (!chip) return;
+            const tipo = chip.dataset.tipo;
+            const valor = chip.dataset.valor;
+            document.getElementById("filtro-titulo").value = "";
+            document.getElementById("filtro-local").value = "";
+            if (tipo === "tema") {
+                document.getElementById("filtro-tema").value = valor;
+                document.getElementById("filtro-autor").value = "";
+            } else {
+                document.getElementById("filtro-autor").value = valor;
+                document.getElementById("filtro-tema").value = "";
+            }
+            paginaAtual = 1;
+            executarPesquisa();
+        });
+
+        // === Acoes na tabela ===
+        document.getElementById("tabela-container").addEventListener("click", (e) => {
+            const botaoPagina = e.target.closest("button[data-pagina]");
+            if (botaoPagina) {
+                const destino = parseInt(botaoPagina.dataset.pagina, 10);
+                if (!Number.isNaN(destino)) {
+                    paginaAtual = destino;
+                    renderizar();
+                }
+                return;
+            }
+
+            const botao = e.target.closest("button[data-action]");
+            if (!botao) return;
+            const indice = parseInt(botao.dataset.indice, 10);
+            const acao = botao.dataset.action;
+            const livro = biblioteca[indice];
+            if (!livro) return;
+
+            switch (acao) {
+                case "editar": abrirEdicao(indice); break;
+                case "emprestar":
+                    livro.emprestado = true;
+                    salvar(); renderizar();
+                    toast(`Livro "${livro.titulo}" emprestado.`);
+                    break;
+                case "devolver":
+                    livro.emprestado = false;
+                    salvar(); renderizar();
+                    toast(`Livro "${livro.titulo}" devolvido.`);
+                    break;
+                case "imprimir": imprimirLivro(livro); break;
+                case "remover":
+                    if (confirm(`Remover o livro "${livro.titulo}"?`)) {
+                        if (livro.id) delete fotos[livro.id];
+                        biblioteca.splice(indice, 1);
+                        salvar(); atualizarTudo();
+                        toast("Livro removido.");
+                    }
+                    break;
+            }
+        });
+
+        // === Edicao ===
+        function abrirEdicao(indice) {
+            const livro = biblioteca[indice];
+            document.getElementById("edit-indice").value = indice;
+            document.getElementById("edit-titulo").value = livro.titulo;
+            popularCampos("edit-autores-container", obterAutores(livro), "autor");
+            popularCampos("edit-temas-container", obterTemas(livro), "tema");
+            document.getElementById("edit-ano").value = livro.ano;
+            document.getElementById("edit-emprestado").value = livro.emprestado ? "1" : "0";
+            document.getElementById("edit-local").value = livro.local || "";
+            document.getElementById("edit-comentarios").value = livro.comentarios || "";
+            const gruposSel = Array.isArray(livro.grupoLiteratura) ? livro.grupoLiteratura : [];
+            const editParticipa = gruposSel.length > 0;
+            document.getElementById("edit-grupo-participa").checked = editParticipa;
+            document.getElementById("edit-grupo-multi").style.display = editParticipa ? "" : "none";
+            preencherCheckboxesGrupo("edit-grupo-checkboxes", gruposSel);
+            if (!livro.id) livro.id = gerarId(livro.titulo, livro.autores);
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = false;
+            const fotoAtual = fotos[livro.id] || null;
+            const eEditFotoImg = document.getElementById("edit-foto-img");
+            const eEditFotoPh = document.getElementById("edit-foto-placeholder");
+            const eEditFotoRem = document.getElementById("btn-edit-foto-remover");
+            if (fotoAtual) {
+                eEditFotoImg.src = fotoAtual;
+                eEditFotoImg.style.display = "";
+                eEditFotoPh.style.display = "none";
+                eEditFotoRem.style.display = "";
+            } else {
+                eEditFotoImg.src = "";
+                eEditFotoImg.style.display = "none";
+                eEditFotoPh.style.display = "";
+                eEditFotoRem.style.display = "none";
+            }
+            document.getElementById("edit-foto-input").value = "";
+            document.getElementById("modal-backdrop").classList.add("active");
+        }
+
+        function fecharEdicao() {
+            document.getElementById("modal-backdrop").classList.remove("active");
+        }
+
+        document.getElementById("btn-cancelar-edicao").addEventListener("click", fecharEdicao);
+        document.getElementById("modal-backdrop").addEventListener("click", (e) => {
+            if (e.target.id === "modal-backdrop") fecharEdicao();
+        });
+
+        document.getElementById("form-edicao").addEventListener("submit", (e) => {
+            e.preventDefault();
+            const indice = parseInt(document.getElementById("edit-indice").value, 10);
+            const livro = biblioteca[indice];
+            if (!livro) { fecharEdicao(); return; }
+            const autores = lerCampos("edit-autores-container", "autor");
+            const temas = lerCampos("edit-temas-container", "tema");
+            const novoTitulo = document.getElementById("edit-titulo").value.trim();
+            if (autores.length === 0) {
+                toast("Informe pelo menos um autor.");
+                return;
+            }
+            if (temas.length === 0) {
+                toast("Informe pelo menos um tema.");
+                return;
+            }
+
+            // Identidade do livro = titulo + conjunto de autores.
+            // Se o usuario nao mexeu nesses dois campos (so adicionou comentario,
+            // mudou tema/ano/status, etc.), nao faz sentido rodar a deteccao de duplicados.
+            const tituloAtualNorm = normalizarComparacao(livro.titulo);
+            const novoTituloNorm = normalizarComparacao(novoTitulo);
+            const autoresAtuaisNorm = new Set(obterAutores(livro).map(normalizarComparacao));
+            const novosAutoresNorm = new Set(autores.map(normalizarComparacao));
+            const identidadeMudou =
+                tituloAtualNorm !== novoTituloNorm ||
+                autoresAtuaisNorm.size !== novosAutoresNorm.size ||
+                ![...novosAutoresNorm].every(a => autoresAtuaisNorm.has(a));
+
+            if (identidadeMudou) {
+                const { exatos, similares } = encontrarDuplicados(novoTitulo, autores, indice);
+                if (exatos.length > 0) {
+                    const d = exatos[0].livro;
+                    alert(`Edicao recusada: a alteracao deixaria este livro identico a outro ja cadastrado.\n\n` +
+                          `Titulo: ${d.titulo}\nAutor(es): ${autoresParaTexto(d)}\nAno: ${d.ano}`);
+                    return;
+                }
+                if (similares.length > 0) {
+                    const lista = similares.slice(0, 5).map(s =>
+                        `  • "${s.livro.titulo}" — ${autoresParaTexto(s.livro)} (${s.livro.ano}) [${s.simTitulo}% similar]`
+                    ).join("\n");
+                    const mais = similares.length > 5 ? `\n  ... e mais ${similares.length - 5}` : "";
+                    if (!confirm(`Atencao: depois desta alteracao, o livro ficara parecido com:\n\n${lista}${mais}\n\nSalvar mesmo assim?`)) {
+                        return;
+                    }
+                }
+            }
+
+            const _oldFotoId = livro.id;
+            livro.titulo = novoTitulo;
+            livro.autores = autores;
+            livro.temas = temas;
+            delete livro.autor;
+            delete livro.tema;
+            livro.id = gerarId(livro.titulo, livro.autores);
+            livro.ano = parseInt(document.getElementById("edit-ano").value, 10);
+            livro.emprestado = document.getElementById("edit-emprestado").value === "1";
+            livro.local = document.getElementById("edit-local").value.trim();
+            livro.comentarios = document.getElementById("edit-comentarios").value.trim();
+            const editParticipa = document.getElementById("edit-grupo-participa").checked;
+            livro.grupoLiteratura = editParticipa ? lerGruposSelecionados("edit-grupo-checkboxes") : [];
+            if (_fotoPendenteEdicao) {
+                fotos[livro.id] = _fotoPendenteEdicao;
+                if (_oldFotoId !== livro.id) delete fotos[_oldFotoId];
+            } else if (_fotoRemovidaEdicao) {
+                delete fotos[_oldFotoId];
+                delete fotos[livro.id];
+            } else if (_oldFotoId !== livro.id && fotos[_oldFotoId]) {
+                fotos[livro.id] = fotos[_oldFotoId];
+                delete fotos[_oldFotoId];
+            }
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = false;
+            salvar();
+            atualizarTudo();
+            fecharEdicao();
+            toast("Livro atualizado.");
+        });
+
+        // === Impressao individual ===
+        function imprimirLivro(livro) {
+            const janela = window.open("", "_blank", "width=520,height=600");
+            janela.document.write(`
+                <html><head><title>Cadastro do Livro</title>
+                <style>
+                    body { font-family: -apple-system, sans-serif; padding: 32px; color: #222; }
+                    h1 { font-size: 18px; border-bottom: 2px solid #222; padding-bottom: 8px; }
+                    dl { margin-top: 16px; }
+                    dt { font-weight: 600; margin-top: 8px; }
+                    dd { margin: 2px 0 0; }
+                </style></head><body>
+                <h1>Cadastro do Livro</h1>
+                <dl>
+                    <dt>Titulo</dt><dd>${escapeHtml(livro.titulo)}</dd>
+                    <dt>Autor(es)</dt><dd>${escapeHtml(autoresParaTexto(livro))}</dd>
+                    <dt>Tema(s)</dt><dd>${escapeHtml(temasParaTexto(livro))}</dd>
+                    <dt>Ano</dt><dd>${livro.ano}</dd>
+                    <dt>Status</dt><dd>${livro.emprestado ? "Emprestado" : "Disponivel"}</dd>
+                    ${(livro.local || "").trim() ? `<dt>Local</dt><dd>${escapeHtml(livro.local)}</dd>` : ""}
+                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${escapeHtml(livro.comentarios)}</dd>` : ""}
+                    <dt>Grupos de Literatura</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : "Nao"}</dd>
+                </dl>
+                <script>window.onload = () => window.print();<\/script>
+                </body></html>
+            `);
+            janela.document.close();
+        }
+
+        // === Impressao de resultados da pesquisa ===
+        function imprimirResultados() {
+            const filtrados = aplicarFiltros();
+            if (filtrados.length === 0) {
+                toast("Nenhum resultado para imprimir.");
+                return;
+            }
+
+            // Monta descricao dos filtros ativos para o cabecalho do relatorio.
+            const filtros = [];
+            const ft = document.getElementById("filtro-titulo").value.trim();
+            const fa = document.getElementById("filtro-autor").value.trim();
+            const fm = document.getElementById("filtro-tema").value.trim();
+            const fl = document.getElementById("filtro-local").value.trim();
+            const fs = document.getElementById("filtro-status").value;
+            const fg = document.getElementById("filtro-grupo").value;
+            if (ft) filtros.push(`Titulo: "${ft}"`);
+            if (fa) filtros.push(`Autor: "${fa}"`);
+            if (fm) filtros.push(`Tema: "${fm}"`);
+            if (fl) filtros.push(`Local: "${fl}"`);
+            if (fs !== "todos") filtros.push(`Status: ${fs === "disponivel" ? "Disponiveis" : "Emprestados"}`);
+            if (fg === "qualquer") filtros.push("Qualquer grupo de literatura");
+            else if (fg) { const g = grupos.find(x => x.id === parseInt(fg, 10)); filtros.push(`Grupo: ${g ? g.nome : fg}`); }
+            const descFiltros = filtros.length > 0 ? filtros.join(" &bull; ") : "Todos os livros";
+
+            const dataHora = new Date().toLocaleString("pt-BR", {
+                day: "2-digit", month: "2-digit", year: "numeric",
+                hour: "2-digit", minute: "2-digit"
+            });
+
+            const linhas = filtrados.map(({ livro }, i) => {
+                const nG = nomeGrupos(livro);
+                const grupo = nG
+                    ? `<span style="color:#166b48;font-weight:600;" title="${escapeHtml(nG)}">&#10003; ${escapeHtml(nG)}</span>`
+                    : `<span style="color:#bbb;">&#8212;</span>`;
+                const status = livro.emprestado
+                    ? `<span style="color:#9d2d22;font-weight:600;">Emprestado</span>`
+                    : `<span style="color:#166b48;">Disponivel</span>`;
+                const fundo = i % 2 === 0 ? "#ffffff" : "#f5f7fb";
+                return `
+                <tr style="background:${fundo};">
+                    <td style="text-align:center;color:#888;">${i + 1}</td>
+                    <td>${escapeHtml(livro.titulo)}</td>
+                    <td>${escapeHtml(autoresParaTexto(livro))}</td>
+                    <td>${escapeHtml(temasParaTexto(livro))}</td>
+                    <td style="text-align:center;">${livro.ano}</td>
+                    <td style="text-align:center;">${status}</td>
+                    <td>${escapeHtml(livro.local || "")}</td>
+                    <td style="text-align:center;">${grupo}</td>
+                </tr>`;
+            }).join("");
+
+            const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatorio de Livros</title>
+<style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+        font-size: 11pt;
+        color: #1a1a2e;
+        background: #fff;
+        padding: 24px 32px;
+    }
+    .cabecalho {
+        border-bottom: 3px solid #2b5fb3;
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .cabecalho h1 {
+        font-size: 16pt;
+        color: #2b5fb3;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+    }
+    .cabecalho .meta {
+        font-size: 9pt;
+        color: #666;
+        text-align: right;
+        line-height: 1.6;
+    }
+    .filtros {
+        background: #f0f4fc;
+        border-left: 4px solid #2b5fb3;
+        padding: 7px 14px;
+        border-radius: 0 6px 6px 0;
+        font-size: 9.5pt;
+        color: #333;
+        margin-bottom: 16px;
+    }
+    .filtros strong { color: #2b5fb3; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9.5pt;
+    }
+    thead tr {
+        background: #2b5fb3;
+        color: #fff;
+    }
+    thead th {
+        padding: 9px 10px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 9pt;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        border-right: 1px solid rgba(255,255,255,0.15);
+        white-space: nowrap;
+    }
+    thead th:last-child { border-right: none; }
+    tbody td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #dde3f0;
+        border-right: 1px solid #dde3f0;
+        vertical-align: middle;
+    }
+    tbody td:last-child { border-right: none; }
+    tbody tr:last-child td { border-bottom: 2px solid #2b5fb3; }
+    .rodape {
+        margin-top: 14px;
+        font-size: 8.5pt;
+        color: #999;
+        display: flex;
+        justify-content: space-between;
+    }
+    @media print {
+        body { padding: 12px 16px; }
+        thead { display: table-header-group; }
+    }
+</style>
+</head>
+<body>
+<div class="cabecalho">
+    <div>
+        <h1>&#128218; Sistema de Gestao de Biblioteca</h1>
+        <div style="font-size:10pt;color:#555;margin-top:3px;">Relatorio de Livros</div>
+    </div>
+    <div class="meta">
+        Gerado em: ${dataHora}<br>
+        Total de livros: <strong>${filtrados.length}</strong>
+    </div>
+</div>
+<div class="filtros">
+    <strong>Filtros aplicados:</strong> ${descFiltros}
+</div>
+<table>
+    <thead>
+        <tr>
+            <th style="width:36px;text-align:center;">#</th>
+            <th style="min-width:180px;">Titulo</th>
+            <th style="min-width:140px;">Autor(es)</th>
+            <th style="min-width:110px;">Tema(s)</th>
+            <th style="width:50px;text-align:center;">Ano</th>
+            <th style="width:90px;text-align:center;">Status</th>
+            <th style="min-width:100px;">Local</th>
+            <th style="width:60px;text-align:center;">Grupo</th>
+        </tr>
+    </thead>
+    <tbody>${linhas}</tbody>
+</table>
+<div class="rodape">
+    <span>Biblioteca &mdash; Relatorio gerado automaticamente</span>
+    <span>${filtrados.length} registro(s)</span>
+</div>
+<script>window.onload = () => window.print();<\/script>
+</body>
+</html>`;
+
+            const janela = window.open("", "_blank", "width=900,height=700");
+            janela.document.write(html);
+            janela.document.close();
+        }
+
+        document.getElementById("btn-imprimir-resultados").addEventListener("click", imprimirResultados);
+
+        // === Exportar Excel (resultados da pesquisa) ===
+
+        function xmlEsc(s) {
+            return String(s == null ? "" : s)
+                .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+
+        function crc32(data) {
+            if (!crc32._t) {
+                crc32._t = new Uint32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    let c = i;
+                    for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                    crc32._t[i] = c;
+                }
+            }
+            let crc = 0xFFFFFFFF;
+            for (const b of data) crc = crc32._t[(crc ^ b) & 0xFF] ^ (crc >>> 8);
+            return (crc ^ 0xFFFFFFFF) >>> 0;
+        }
+
+        function criarZIP(arquivos) {
+            const enc = new TextEncoder();
+            const partes = [], centralDir = [];
+            let offset = 0;
+            for (const {nome, dados} of arquivos) {
+                const nb = enc.encode(nome);
+                const crc = crc32(dados);
+                const lh = new Uint8Array(30 + nb.length);
+                const lv = new DataView(lh.buffer);
+                lv.setUint32(0, 0x04034B50, true); lv.setUint16(4, 20, true);
+                lv.setUint32(14, crc, true); lv.setUint32(18, dados.length, true);
+                lv.setUint32(22, dados.length, true); lv.setUint16(26, nb.length, true);
+                lh.set(nb, 30);
+                const cd = new Uint8Array(46 + nb.length);
+                const cv = new DataView(cd.buffer);
+                cv.setUint32(0, 0x02014B50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+                cv.setUint32(16, crc, true); cv.setUint32(20, dados.length, true);
+                cv.setUint32(24, dados.length, true); cv.setUint16(28, nb.length, true);
+                cv.setUint32(42, offset, true);
+                cd.set(nb, 46);
+                partes.push(lh, dados); centralDir.push(cd);
+                offset += lh.length + dados.length;
+            }
+            const cdSize = centralDir.reduce((s, c) => s + c.length, 0);
+            const eocd = new Uint8Array(22);
+            const ev = new DataView(eocd.buffer);
+            ev.setUint32(0, 0x06054B50, true);
+            ev.setUint16(8, arquivos.length, true); ev.setUint16(10, arquivos.length, true);
+            ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true);
+            const todas = [...partes, ...centralDir, eocd];
+            const total = todas.reduce((s, p) => s + p.length, 0);
+            const out = new Uint8Array(total);
+            let pos = 0;
+            for (const p of todas) { out.set(p, pos); pos += p.length; }
+            return out;
+        }
+
+        function gerarXLSX(filtrados) {
+            const enc = new TextEncoder();
+            const strs = [], strIdx = {};
+            function S(s) {
+                const k = String(s == null ? "" : s);
+                if (!(k in strIdx)) { strIdx[k] = strs.length; strs.push(k); }
+                return strIdx[k];
+            }
+
+            const cabecalho = ["#", "Titulo", "Autor(es)", "Tema(s)", "Ano", "Status", "Local", "Grupo Literatura", "Comentarios"];
+            const larguras  = [5,    35,        25,           20,        7,     15,        20,      12,                  45];
+            // s=1: cabeçalho (negrito, bordas médias, sem wrap)
+            // s=2: dados (bordas médias verticais + finas horizontais, wrap, centro vertical)
+
+            const linhas = [];
+            // Linha de cabeçalho — todas as células com estilo 1
+            linhas.push(cabecalho.map(c => ({t: "s", v: S(c), s: 1})));
+
+            for (let i = 0; i < filtrados.length; i++) {
+                const lv = filtrados[i].livro;
+                const anoNum = parseInt(lv.ano);
+                linhas.push([
+                    {t: "n", v: i + 1,                                           s: 2},
+                    {t: "s", v: S(lv.titulo),                                    s: 2},
+                    {t: "s", v: S(autoresParaTexto(lv)),                         s: 2},
+                    {t: "s", v: S(temasParaTexto(lv)),                           s: 2},
+                    isNaN(anoNum) ? {t: "s", v: S(""), s: 2} : {t: "n", v: anoNum, s: 2},
+                    {t: "s", v: S(lv.emprestado ? "Emprestado" : "Disponivel"),  s: 2},
+                    {t: "s", v: S(lv.local || ""),                               s: 2},
+                    {t: "s", v: S(nomeGrupos(lv) || ""),                          s: 2},
+                    {t: "s", v: S(lv.comentarios || ""),                         s: 2},
+                ]);
+            }
+
+            const colsXML = larguras.map((w, i) =>
+                `<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
+
+            const rowsXML = linhas.map((row, ri) =>
+                `<row r="${ri+1}">${row.map((c, ci) => {
+                    const ref = String.fromCharCode(65 + ci) + (ri + 1);
+                    const sa = c.s ? ` s="${c.s}"` : "";
+                    if (c.t === "n") return `<c r="${ref}"${sa}><v>${c.v}</v></c>`;
+                    return `<c r="${ref}" t="s"${sa}><v>${c.v}</v></c>`;
+                }).join("")}</row>`
+            ).join("");
+
+            const stylesXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<fonts count="2">
+<font><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="11"/><name val="Calibri"/></font>
+</fonts>
+<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
+<borders count="3">
+<border><left/><right/><top/><bottom/><diagonal/></border>
+<border><left style="medium"/><right style="medium"/><top style="medium"/><bottom style="medium"/><diagonal/></border>
+<border><left style="medium"/><right style="medium"/><top style="thin"/><bottom style="thin"/><diagonal/></border>
+</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="3">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0"/>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="2" xfId="0"><alignment wrapText="1" vertical="center"/></xf>
+</cellXfs>
+</styleSheet>`;
+
+            const ssXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${strs.length}" uniqueCount="${strs.length}">
+${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
+</sst>`;
+
+            const wsXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<cols>${colsXML}</cols>
+<sheetData>${rowsXML}</sheetData>
+</worksheet>`;
+
+            const wbXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="Resultados" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+
+            const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+            const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+            const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+            return criarZIP([
+                {nome: "[Content_Types].xml",        dados: enc.encode(ct)},
+                {nome: "_rels/.rels",                dados: enc.encode(rels)},
+                {nome: "xl/workbook.xml",            dados: enc.encode(wbXML)},
+                {nome: "xl/_rels/workbook.xml.rels", dados: enc.encode(wbRels)},
+                {nome: "xl/worksheets/sheet1.xml",   dados: enc.encode(wsXML)},
+                {nome: "xl/sharedStrings.xml",       dados: enc.encode(ssXML)},
+                {nome: "xl/styles.xml",              dados: enc.encode(stylesXML)},
+            ]);
+        }
+
+        function exportarResultadosExcel() {
+            const filtrados = aplicarFiltros();
+            if (filtrados.length === 0) { toast("Nenhum resultado para exportar."); return; }
+            const xlsx = gerarXLSX(filtrados);
+            const blob = new Blob([xlsx], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "resultados_biblioteca.xlsx";
+            link.click();
+            URL.revokeObjectURL(url);
+            const el = document.getElementById("toast");
+            el.textContent = "Planilha salva em ~/Downloads/resultados_biblioteca.xlsx";
+            el.classList.add("show");
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => el.classList.remove("show"), 6000);
+        }
+
+        document.getElementById("btn-exportar-excel-resultados").addEventListener("click", exportarResultadosExcel);
+
+        // === Importar / Exportar ===
+        document.getElementById("btn-importar").addEventListener("click", () => {
+            document.getElementById("arquivo-importar").click();
+        });
+
+        document.getElementById("arquivo-importar").addEventListener("change", (e) => {
+            const arquivo = e.target.files[0];
+            if (!arquivo) return;
+            const leitor = new FileReader();
+            leitor.onload = (ev) => {
+                try {
+                    const importados = parseTSV(ev.target.result);
+                    if (importados.length === 0) {
+                        toast("Nenhum livro valido encontrado no arquivo.");
+                        return;
+                    }
+                    const subst = confirm(`Importar ${importados.length} livro(s)? OK substitui a lista atual, Cancelar adiciona ao final.`);
+                    biblioteca = subst ? importados : biblioteca.concat(importados);
+                    salvar();
+                    atualizarTudo();
+                    toast(`${importados.length} livro(s) importado(s).`);
+                } catch {
+                    toast("Erro ao ler o arquivo.");
+                }
+                e.target.value = "";
+            };
+            leitor.readAsText(arquivo);
+        });
+
+        // === Importar do Excel (Grupo de Literatura) ===
+
+        async function inflateDeflate(data) {
+            const ds = new DecompressionStream("deflate-raw");
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(data);
+            writer.close();
+            const chunks = [];
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+            }
+            const total = chunks.reduce((acc, c) => acc + c.length, 0);
+            const out = new Uint8Array(total);
+            let pos = 0;
+            for (const c of chunks) { out.set(c, pos); pos += c.length; }
+            return out;
+        }
+
+        async function lerXLSX(file) {
+            const buf = new Uint8Array(await file.arrayBuffer());
+            const view = new DataView(buf.buffer);
+            const dec = new TextDecoder("utf-8");
+
+            // Locate End of Central Directory record
+            let eocd = -1;
+            for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i--) {
+                if (buf[i] === 0x50 && buf[i+1] === 0x4B && buf[i+2] === 0x05 && buf[i+3] === 0x06) {
+                    eocd = i; break;
+                }
+            }
+            if (eocd < 0) throw new Error("Arquivo ZIP inválido");
+
+            const cdCount = view.getUint16(eocd + 8, true);
+            const cdOffset = view.getUint32(eocd + 16, true);
+
+            // Build entry index from central directory
+            const entries = {};
+            let p = cdOffset;
+            for (let i = 0; i < cdCount; i++) {
+                if (view.getUint32(p, true) !== 0x02014B50) break;
+                const method    = view.getUint16(p + 10, true);
+                const compSize  = view.getUint32(p + 20, true);
+                const nameLen   = view.getUint16(p + 28, true);
+                const extraLen  = view.getUint16(p + 30, true);
+                const cmtLen    = view.getUint16(p + 32, true);
+                const localOff  = view.getUint32(p + 42, true);
+                const name = dec.decode(buf.slice(p + 46, p + 46 + nameLen));
+                entries[name] = { method, compSize, localOff };
+                p += 46 + nameLen + extraLen + cmtLen;
+            }
+
+            async function getXML(name) {
+                const e = entries[name];
+                if (!e) return null;
+                const lhNameLen  = view.getUint16(e.localOff + 26, true);
+                const lhExtraLen = view.getUint16(e.localOff + 28, true);
+                const dataStart  = e.localOff + 30 + lhNameLen + lhExtraLen;
+                const raw = buf.slice(dataStart, dataStart + e.compSize);
+                const inflated = e.method === 8 ? await inflateDeflate(raw) : raw;
+                return new DOMParser().parseFromString(dec.decode(inflated), "application/xml");
+            }
+
+            // Find sheet named "2017-2026" via workbook.xml + rels
+            const wb = await getXML("xl/workbook.xml");
+            if (!wb) throw new Error("workbook.xml não encontrado");
+            const sheetNode = [...wb.querySelectorAll("sheet")].find(s => s.getAttribute("name") === "2017-2026");
+            if (!sheetNode) throw new Error('Aba "2017-2026" não encontrada no arquivo');
+
+            const rels = await getXML("xl/_rels/workbook.xml.rels");
+            const rId = sheetNode.getAttribute("r:id");
+            const relNode = rels && [...rels.querySelectorAll("Relationship")].find(r => r.getAttribute("Id") === rId);
+            const wsPath = relNode
+                ? "xl/" + relNode.getAttribute("Target")
+                : "xl/worksheets/sheet" + sheetNode.getAttribute("sheetId") + ".xml";
+
+            // Shared strings
+            const ssDoc = await getXML("xl/sharedStrings.xml");
+            const sharedStrings = ssDoc
+                ? [...ssDoc.querySelectorAll("si")].map(si =>
+                    [...si.querySelectorAll("t")].map(t => t.textContent).join(""))
+                : [];
+
+            // Parse worksheet rows into sparse column maps
+            const ws = await getXML(wsPath);
+            if (!ws) throw new Error("Planilha não encontrada no arquivo");
+
+            const rows = [];
+            for (const rowEl of ws.querySelectorAll("row")) {
+                const rowData = {};
+                for (const c of rowEl.querySelectorAll("c")) {
+                    const ref = c.getAttribute("r") || "";
+                    const colStr = ref.replace(/[0-9]/g, "");
+                    const colIdx = colStr.split("").reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+                    const t = c.getAttribute("t");
+                    const vEl = c.querySelector("v");
+                    const isEl = c.querySelector("is t");
+                    let val = null;
+                    if (isEl) {
+                        val = isEl.textContent;
+                    } else if (vEl) {
+                        if (t === "s") val = sharedStrings[parseInt(vEl.textContent)] ?? "";
+                        else if (t === "str") val = vEl.textContent;
+                        else { const n = Number(vEl.textContent); val = isNaN(n) ? vEl.textContent : n; }
+                    }
+                    rowData[colIdx] = val;
+                }
+                rows.push(rowData);
+            }
+            return rows;
+        }
+
+        function processarPlanilhaGrupo(rows) {
+            const PADRAO_DATA = /^\d{2}\/\d{2}\/\d{4}/;
+            const grupos = [];
+            let anoAtual = null;
+            let autorAtual = null;
+
+            for (const row of rows) {
+                const colA = row[0], colB = row[1], colC = row[2];
+
+                if (typeof colA === "number" && colA >= 2000 && colA <= 2099) {
+                    anoAtual = Math.round(colA);
+                }
+
+                if (colB !== null && colB !== undefined) {
+                    const strB = String(colB).trim();
+                    if (strB) {
+                        if (PADRAO_DATA.test(strB)) {
+                            if (grupos.length > 0 && grupos[grupos.length - 1].autor === autorAtual) {
+                                grupos[grupos.length - 1].datas = strB;
+                            }
+                        } else {
+                            autorAtual = strB;
+                            if (anoAtual) grupos.push({ ano: anoAtual, autor: autorAtual, datas: "", obras: [] });
+                        }
+                    }
+                }
+
+                if (colC !== null && colC !== undefined) {
+                    const strC = String(colC).trim();
+                    if (strC && grupos.length > 0) grupos[grupos.length - 1].obras.push(strC);
+                }
+            }
+
+            let atualizados = 0, adicionados = 0;
+
+            for (const g of grupos) {
+                // Procura uma entrada existente: primeiro por titulo, depois por "Contos:" nos comentarios
+                let idx = -1;
+                for (const obra of g.obras) {
+                    const n = normalizarComparacao(obra);
+                    idx = biblioteca.findIndex(l => normalizarComparacao(l.titulo) === n);
+                    if (idx >= 0) break;
+                }
+                if (idx < 0) {
+                    for (const obra of g.obras) {
+                        const n = normalizarComparacao(obra);
+                        idx = biblioteca.findIndex(l => {
+                            const m = (l.comentarios || "").match(/Contos: (.+)/);
+                            return m && m[1].split(";").some(t => normalizarComparacao(t.trim()) === n);
+                        });
+                        if (idx >= 0) break;
+                    }
+                }
+
+                // Filtros: excluir entradas inválidas
+                // 1. Sem obras
+                if (g.obras.length === 0) continue;
+                // 2. Nome de autor começa com dígito (faixas de datas: "1867 - 1930", "28373"...)
+                if (/^\d/.test(g.autor)) continue;
+                // 3. Todas as obras terminam com "(nome)" — indica entradas musicais com participantes
+                if (g.obras.every(o => /\([^)]+\)\s*$/.test(o.trim()))) continue;
+
+                if (idx >= 0) {
+                    if (!Array.isArray(biblioteca[idx].grupoLiteratura)) biblioteca[idx].grupoLiteratura = [];
+                    if (!biblioteca[idx].grupoLiteratura.includes(1)) biblioteca[idx].grupoLiteratura.push(1);
+                    if (!biblioteca[idx].local || !biblioteca[idx].local.trim()) {
+                        biblioteca[idx].local = "Grupo de Literatura";
+                    }
+                    atualizados++;
+                } else {
+                    // Adiciona uma entrada por grupo (mesmo formato do script Python)
+                    const partes = [];
+                    if (g.datas) partes.push("Datas: " + g.datas);
+                    if (g.obras.length > 0) partes.push("Contos: " + g.obras.join("; "));
+                    biblioteca.push({
+                        titulo: g.obras[0] || g.autor,
+                        autores: [g.autor],
+                        temas: ["Literatura"],
+                        ano: g.ano,
+                        emprestado: false,
+                        comentarios: partes.join(" | "),
+                        local: "Grupo de Literatura",
+                        grupoLiteratura: [1]
+                    });
+                    adicionados++;
+                }
+            }
+
+            return { atualizados, adicionados };
+        }
+
+        document.getElementById("btn-importar-excel").addEventListener("click", () => {
+            document.getElementById("arquivo-excel").click();
+        });
+
+        document.getElementById("arquivo-excel").addEventListener("change", async (e) => {
+            const arquivo = e.target.files[0];
+            if (!arquivo) return;
+            try {
+                toast("Lendo planilha...");
+                const rows = await lerXLSX(arquivo);
+                const { atualizados, adicionados } = processarPlanilhaGrupo(rows);
+                salvar();
+                atualizarTudo();
+                const el = document.getElementById("toast");
+                el.textContent = `Grupo Literatura: ${atualizados} atualizados, ${adicionados} novos.`;
+                el.classList.add("show");
+                clearTimeout(toast._t);
+                toast._t = setTimeout(() => el.classList.remove("show"), 6000);
+            } catch (err) {
+                toast("Erro ao ler planilha: " + err.message);
+            }
+            e.target.value = "";
+        });
+
+        async function exportarArquivo() {
+            if (biblioteca.length === 0) {
+                toast("Nenhum livro para exportar.");
+                return false;
+            }
+            const conteudo = serializarTSV();
+
+            // Ponte nativa: app macOS (WKWebView). O Swift recebe o conteudo e mostra NSSavePanel.
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    await window.webkit.messageHandlers.exportar.postMessage(conteudo);
+                } catch (e) {
+                    toast("Erro ao exportar.");
+                }
+                return true;
+            }
+
+            // Tenta showSaveFilePicker para o usuario poder escolher a pasta de destino
+            // (util no Windows ou em VMs onde o arquivo nao fica na pasta Downloads).
+            if ("showSaveFilePicker" in window) {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: "biblioteca.txt",
+                        types: [{ description: "Arquivo da biblioteca", accept: { "text/plain": [".txt"] } }]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(conteudo);
+                    await writable.close();
+                    toast(`${biblioteca.length} livro(s) exportado(s) para ${escapeHtml(handle.name)}.`);
+                    return true;
+                } catch (e) {
+                    if (e.name === "AbortError") return false; // usuario cancelou
+                    // Qualquer outro erro (SecurityError, etc.): cai no download padrao
+                }
+            }
+
+            // Fallback: download para a pasta Downloads do navegador
+            const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "biblioteca.txt";
+            link.click();
+            URL.revokeObjectURL(url);
+            toast("Arquivo biblioteca.txt salvo em Downloads.");
+            return true;
+        }
+
+        document.getElementById("btn-exportar").addEventListener("click", exportarArquivo);
+
+        async function encerrarInterface() {
+            // Salvar no arquivo vinculado (se houver) e avisar o usuario
+            if (arquivoHandle && biblioteca.length > 0) {
+                const ok = await salvarNoArquivo();
+                if (ok) {
+                    toast(`Arquivo ${escapeHtml(arquivoHandle.name)} salvo (${biblioteca.length} livro(s)).`, 3000);
+                    await new Promise(res => setTimeout(res, 900));
+                } else {
+                    toast("Atencao: nao foi possivel salvar o arquivo antes de encerrar.", 3500);
+                    await new Promise(res => setTimeout(res, 1200));
+                }
+            }
+
+            if (!confirm("Encerrar a interface?")) return;
+
+            // Modo nativo macOS: pede ao Swift para encerrar o app
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
+                return;
+            }
+
+            window.open("", "_self");
+            window.close();
+
+            const estadoArquivo = arquivoHandle
+                ? `Alteracoes gravadas em <strong>${escapeHtml(arquivoHandle.name)}</strong>.`
+                : `Voce pode fechar esta aba do navegador.`;
+
+            setTimeout(() => {
+                document.body.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,sans-serif;color:#1f2937;text-align:center;padding:24px;">
+                        <div>
+                            <h1 style="font-size:22px;margin:0 0 8px;">Interface encerrada</h1>
+                            <p style="color:#6b7280;margin:0;">${estadoArquivo}</p>
+                        </div>
+                    </div>
+                `;
+            }, 100);
+        }
+
+        document.getElementById("btn-encerrar").addEventListener("click", encerrarInterface);
+        document.getElementById("btn-encerrar-topo").addEventListener("click", encerrarInterface);
+
+        document.getElementById("btn-limpar-tudo").addEventListener("click", () => {
+            if (!confirm("Apagar TODOS os livros da lista? Esta ação não pode ser desfeita.")) return;
+            if (!confirm("Tem certeza? Todos os cadastros serão removidos.")) return;
+            biblioteca = [];
+            arquivoHandle = null;
+            salvar();
+            atualizarTudo();
+            atualizarBannerSync("neutro");
+            toast("Lista apagada.");
+        });
+
+
+
+
+        // === Assistente de primeiro uso ===
+        (function verificarPrimeiroUso() {
+            if (window.__TAURI__) return; // Tauri cria o arquivo automaticamente
+            const jaUsou = localStorage.getItem(STORAGE_KEY) !== null
+                        || localStorage.getItem("biblioteca-primeiro-uso-concluido") === "1";
+            if (jaUsou) return;
+
+            const modal = document.getElementById("modal-primeiro-uso");
+            modal.style.display = "flex";
+
+            function fechar() {
+                modal.style.display = "none";
+                localStorage.setItem("biblioteca-primeiro-uso-concluido", "1");
+            }
+
+            document.getElementById("btn-puso-vincular").addEventListener("click", () => {
+                fechar();
+                setTimeout(() => document.getElementById("btn-vincular").click(), 100);
+            });
+            document.getElementById("btn-puso-importar").addEventListener("click", () => {
+                fechar();
+                setTimeout(() => document.getElementById("btn-importar").click(), 100);
+            });
+            document.getElementById("btn-puso-depois").addEventListener("click", fechar);
+        })();
+
+        // === Backup ===
+        document.getElementById("btn-backup").addEventListener("click", async () => {
+            if (biblioteca.length === 0) { toast("Nada para fazer backup."); return; }
+            const agora = new Date();
+            const sufixo = agora.getFullYear()
+                + "-" + String(agora.getMonth()+1).padStart(2,"0")
+                + "-" + String(agora.getDate()).padStart(2,"0")
+                + "_" + String(agora.getHours()).padStart(2,"0")
+                + "h" + String(agora.getMinutes()).padStart(2,"0");
+            const nome = "biblioteca_" + sufixo + ".txt";
+
+            if (window.__TAURI__) {
+                // App instalável: Rust salva na mesma pasta do biblioteca.txt
+                try {
+                    const caminho = await window.__TAURI__.core.invoke('fazer_backup', { sufixo });
+                    toast("Backup salvo: " + caminho.split(/[\\/]/).pop());
+                } catch (e) {
+                    toast("Erro no backup: " + e);
+                }
+            } else if ('showSaveFilePicker' in window) {
+                // Browser com File System Access API: abre diálogo já na pasta do arquivo vinculado
+                const opts = {
+                    suggestedName: nome,
+                    types: [{ description: "Arquivo de texto", accept: { "text/plain": [".txt"] } }],
+                };
+                if (arquivoHandle) opts.startIn = arquivoHandle;
+                try {
+                    const handle = await window.showSaveFilePicker(opts);
+                    const writable = await handle.createWritable();
+                    await writable.write(serializarTSV());
+                    await writable.close();
+                    toast("Backup salvo: " + handle.name);
+                } catch (e) {
+                    if (e.name !== "AbortError") toast("Erro ao salvar backup: " + e.message);
+                }
+            } else {
+                // Fallback (Safari): baixa para Downloads
+                const blob = new Blob([serializarTSV()], { type: "text/plain" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = nome;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                toast("Backup baixado para Downloads: " + nome);
+            }
+        });
+
+        document.getElementById("btn-backup-json").addEventListener("click", () => {
+            const conteudo = JSON.stringify(biblioteca, null, 2);
+            const blob = new Blob([conteudo], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            const dataHora = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+            link.href = url;
+            link.download = `biblioteca-backup-${dataHora}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            toast("Backup JSON baixado.");
+        });
+
+        document.getElementById("btn-mostrar-storage").addEventListener("click", () => {
+            const bruto = localStorage.getItem(STORAGE_KEY);
+            const textarea = document.getElementById("textarea-restaurar");
+            if (!bruto) {
+                textarea.value = "";
+                toast("Nada no localStorage para esta chave.");
+                return;
+            }
+            try {
+                const arr = JSON.parse(bruto);
+                textarea.value = JSON.stringify(arr, null, 2);
+                toast(`localStorage tem ${Array.isArray(arr) ? arr.length : "?"} livro(s).`);
+            } catch {
+                textarea.value = bruto;
+                toast("Conteudo do localStorage carregado (formato bruto).");
+            }
+        });
+
+        document.getElementById("btn-restaurar-json").addEventListener("click", () => {
+            const texto = document.getElementById("textarea-restaurar").value.trim();
+            if (!texto) {
+                toast("Cole o JSON antes de restaurar.");
+                return;
+            }
+            let dados;
+            try {
+                dados = JSON.parse(texto);
+            } catch (e) {
+                toast("JSON invalido: " + e.message);
+                return;
+            }
+            if (!Array.isArray(dados)) {
+                toast("O JSON precisa ser um array de livros.");
+                return;
+            }
+            const importados = dados.map(normalizarLivro);
+            const validos = importados.filter(l => l.titulo);
+            if (validos.length === 0) {
+                toast("Nenhum livro valido encontrado.");
+                return;
+            }
+            const acao = confirm(
+                `Encontrados ${validos.length} livro(s) no JSON. A biblioteca atual tem ${biblioteca.length} livro(s).\n\n` +
+                "OK = substituir a lista atual.\n" +
+                "Cancelar = adicionar ao final (manter os atuais)."
+            );
+            biblioteca = acao ? validos : biblioteca.concat(validos);
+            salvar();
+            paginaAtual = 1;
+            atualizarTudo();
+            toast(`Restaurados ${validos.length} livro(s). Total agora: ${biblioteca.length}.`);
+        });
+
+        document.getElementById("btn-limpar-textarea").addEventListener("click", () => {
+            document.getElementById("textarea-restaurar").value = "";
+        });
+
+        // === Inicializacao da sincronizacao de arquivo ===
+        document.getElementById("btn-vincular").addEventListener("click", () => {
+            if (arquivoHandle) {
+                reativarPermissao();
+            } else {
+                vincularArquivo();
+            }
+        });
+        document.getElementById("btn-desvincular").addEventListener("click", () => {
+            if (confirm("Desvincular biblioteca.txt? As alteracoes seguintes nao serao mais gravadas no arquivo.")) {
+                desvincularArquivo();
+            }
+        });
+        document.getElementById("btn-recarregar").addEventListener("click", recarregarDoArquivo);
+
+        document.querySelectorAll(".btn-add-autor, .btn-add-tema").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const containerId = btn.dataset.target;
+                const tipo = btn.classList.contains("btn-add-autor") ? "autor" : "tema";
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                const nova = criarLinhaCampo("", containerId, tipo);
+                container.appendChild(nova);
+                nova.querySelector("input").focus();
+            });
+        });
+
+        // Flag de coordenação: garante que safety-net e IIFE não alterem arquivoHandle ao mesmo tempo.
+        let _startupAborted = false;
+
+        // Rede de segurança: se após 4s o banner ainda mostrar "Inicializando...",
+        // a inicialização travou (ex: queryPermission bloqueado em file:/// no Windows).
+        setTimeout(() => {
+            const msgEl = document.getElementById("sync-mensagem");
+            if (msgEl && msgEl.textContent.trim() === "Inicializando...") {
+                _startupAborted = true;   // sinaliza à IIFE para não continuar
+                arquivoHandle = null;     // garante que o botão chame vincularArquivo(), não reativarPermissao()
+                atualizarBannerSync(SUPORTA_FSA ? "desvinculado" : "nao-suportado");
+            }
+        }, 4000);
+
+        (async () => {
+            if (window.__BIBLIOTECA_NATIVE__) return; // dados injetados pelo Swift via WKWebView
+            if (!SUPORTA_FSA) {
+                atualizarBannerSync("nao-suportado");
+                return;
+            }
+            const handleSalvo = await carregarHandleDB();
+            if (_startupAborted) return;
+            if (!handleSalvo) {
+                atualizarBannerSync("desvinculado");
+                return;
+            }
+            arquivoHandle = handleSalvo;
+            const temPermissao = await verificarPermissaoEscrita(handleSalvo, false);
+            if (_startupAborted) { arquivoHandle = null; return; }
+            if (!temPermissao) {
+                atualizarBannerSync("pendente");
+                return;
+            }
+            // Permissão ativa: lê o arquivo como fonte de verdade.
+            // Garante que alterações feitas por outros programas (C++, iCloud, etc.) sejam refletidas.
+            try {
+                const prazo = new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 5000));
+                const file = await Promise.race([handleSalvo.getFile(), prazo]);
+                if (_startupAborted) { arquivoHandle = null; return; }
+                const importados = parseTSV(await Promise.race([file.text(), prazo]));
+                if (_startupAborted) { arquivoHandle = null; return; }
+                const anterior = biblioteca.length;
+                biblioteca = importados;
+                salvar();
+                paginaAtual = 1;
+                atualizarTudo();
+                atualizarBannerSync("ok");
+                const msg = importados.length !== anterior
+                    ? `Arquivo atualizado: ${importados.length} livro(s) carregado(s) (antes: ${anterior}).`
+                    : `${importados.length} livro(s) carregado(s) do arquivo.`;
+                toast(msg, 3500);
+            } catch {
+                // Falha ou timeout ao ler — mantém dados do localStorage e mostra banner pendente.
+                if (!_startupAborted) atualizarBannerSync("pendente");
+            }
+        })();
+
+        // ── Aviso de compatibilidade com navegador ──────────────────────────
+        (function verificarNavegador() {
+            // No app instalável (Tauri ou WKWebView nativo) não há restrições de navegador
+            if (window.__TAURI__) return;
+            if (window.__BIBLIOTECA_NATIVE__) return;
+
+            const CHAVE_AVISO = "biblioteca-aviso-navegador-dispensado";
+            if (localStorage.getItem(CHAVE_AVISO) === "1") return;
+
+            const ua = navigator.userAgent;
+            const vendor = navigator.vendor || "";
+            const eSafari = /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua) && /Apple/i.test(vendor);
+
+            if (!eSafari) return; // Chrome, Firefox e outros: sem restrições
+
+            const limitacoes = [
+                "O botão <strong>Encerrar</strong> não consegue fechar a aba — use <kbd style='background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;padding:1px 5px;font-size:11px;'>⌘ W</kbd> para fechar manualmente.",
+                "O vínculo com o arquivo <code style='background:#f3f4f6;font-size:11px;padding:1px 4px;border-radius:3px;'>biblioteca.txt</code> não é lembrado entre sessões — será necessário vincular novamente a cada abertura.",
+                "⚠️ <strong>Importante:</strong> ao abrir o programa, use <strong>Importar</strong> para carregar a versão mais atual do <code style='background:#f3f4f6;font-size:11px;padding:1px 4px;border-radius:3px;'>biblioteca.txt</code> antes de fazer qualquer alteração. Ao terminar, use <strong>Exportar</strong> para salvar."
+            ];
+
+            document.getElementById("nome-navegador-aviso").textContent = "Safari";
+            const ul = document.getElementById("lista-limitacoes-navegador");
+            limitacoes.forEach(txt => {
+                const li = document.createElement("li");
+                li.innerHTML = txt;
+                ul.appendChild(li);
+            });
+
+            const modal = document.getElementById("modal-navegador");
+            modal.style.display = "flex";
+        })();
+
+        function fecharModalNavegador() {
+            const modal = document.getElementById("modal-navegador");
+            modal.style.display = "none";
+            if (document.getElementById("chk-nao-mostrar-aviso").checked) {
+                try { localStorage.setItem("biblioteca-aviso-navegador-dispensado", "1"); } catch(e) {}
+            }
+        }
+    </script>
+</body>
+</html>
