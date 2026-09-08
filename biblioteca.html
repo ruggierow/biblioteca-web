@@ -3353,21 +3353,42 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         document.getElementById("btn-exportar").addEventListener("click", exportarArquivo);
 
         document.getElementById("btn-exportar-fotos-dat").addEventListener("click", async () => {
+            // 1. Fotos do Chrome (localStorage)
             const raw = localStorage.getItem("biblioteca-fotos");
-            const fotos = raw ? JSON.parse(raw) : {};
-            const total = Object.keys(fotos).length;
-            if (total === 0) { alert("Nenhuma foto encontrada."); return; }
+            const fotosChrome = raw ? JSON.parse(raw) : {};
+            if (Object.keys(fotosChrome).length === 0) { alert("Nenhuma foto encontrada no Chrome."); return; }
+
             try {
-                const handle = await window.showSaveFilePicker({
+                // 2. Abre o biblioteca.dat existente para fazer merge
+                let fotosExistentes = {};
+                try {
+                    const [readHandle] = await window.showOpenFilePicker({
+                        id: "dat-merge",
+                        startIn: "downloads",
+                        types: [{ description: "biblioteca.dat", accept: { "application/json": [".dat"] } }]
+                    });
+                    const texto = await (await readHandle.getFile()).text();
+                    fotosExistentes = JSON.parse(texto);
+                } catch (e) {
+                    if (e.name !== "AbortError") { /* dat não existe ainda — ok */ }
+                    else return; // usuário cancelou
+                }
+
+                // 3. Merge: dat existente + fotos do Chrome (Chrome ganha em conflito)
+                const merged = Object.assign({}, fotosExistentes, fotosChrome);
+                const total = Object.keys(merged).length;
+
+                // 4. Salva o resultado
+                const saveHandle = await window.showSaveFilePicker({
                     suggestedName: "biblioteca.dat",
-                    types: [{ description: "Arquivo de fotos", accept: { "application/json": [".dat"] } }]
+                    types: [{ description: "biblioteca.dat", accept: { "application/json": [".dat"] } }]
                 });
-                const writable = await handle.createWritable();
-                await writable.write(JSON.stringify(fotos));
+                const writable = await saveHandle.createWritable();
+                await writable.write(JSON.stringify(merged));
                 await writable.close();
-                alert(total + " foto(s) exportada(s) com sucesso!\nSalve na pasta Biblioteca no iCloud Drive.");
+                alert(total + " foto(s) no arquivo final.\nSalve na pasta Biblioteca no iCloud Drive.");
             } catch (e) {
-                if (e.name !== "AbortError") alert("Erro ao exportar: " + e.message);
+                if (e.name !== "AbortError") alert("Erro: " + e.message);
             }
         });
 
