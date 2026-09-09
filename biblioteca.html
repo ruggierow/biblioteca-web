@@ -1184,6 +1184,7 @@
         let paginaAtual = 1;
         let arquivoHandle = null;
         let datHandle = null;
+        let _datLidoNestaSessao = false; // só grava no .dat se ele foi lido com sucesso
 
         const FOTOS_KEY = "biblioteca-fotos";
         let fotos = (() => { try { return JSON.parse(localStorage.getItem(FOTOS_KEY)) || {}; } catch { return {}; } })();
@@ -1511,8 +1512,9 @@
         async function lerFotosDoDat() {
             if (!datHandle) return 0;
             try {
-                const perm = await datHandle.queryPermission({ mode: "readwrite" });
-                if (perm !== "granted") await datHandle.requestPermission({ mode: "readwrite" });
+                // Apenas leitura: "read" já é concedido por showOpenFilePicker; "readwrite" falha
+                const perm = await datHandle.queryPermission({ mode: "read" });
+                if (perm !== "granted") await datHandle.requestPermission({ mode: "read" });
                 const file = await datHandle.getFile();
                 const text = await file.text();
                 if (!text) return 0;
@@ -1524,6 +1526,7 @@
                 }
                 if (total > 0) {
                     localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                    _datLidoNestaSessao = true; // libera gravarFotosNoDat para esta sessão
                 }
                 return total;
             } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
@@ -1532,6 +1535,7 @@
         // Grava fotos atuais em biblioteca.dat vinculado.
         async function gravarFotosNoDat() {
             if (!datHandle || !SUPORTA_FSA) return;
+            if (!_datLidoNestaSessao) return; // nunca sobrescreve sem ter lido o .dat antes
             if (Object.keys(fotos).length === 0) return;
             try {
                 const perm = await datHandle.queryPermission({ mode: "readwrite" });
