@@ -304,6 +304,8 @@
 
         .btn-danger { background: var(--danger); color: #fff; }
         .btn-danger:hover { background: var(--danger-hover); }
+        .btn-ok { background: var(--success, #2a9d5c); color: #fff; }
+        .btn-ok:hover { background: var(--success-hover, #21834c); }
 
         .btn-small {
             font-size: 12px;
@@ -972,6 +974,7 @@
             </p>
             <div class="button-row">
                 <button type="button" id="btn-vincular" class="btn-primary">Vincular biblioteca.txt</button>
+                <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos">Vincular fotos (.dat)</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
@@ -1174,11 +1177,13 @@
         const DB_NAME = "biblioteca-handles";
         const STORE_HANDLES = "handles";
         const KEY_HANDLE = "arquivo-biblioteca";
+        const KEY_DAT_HANDLE = "dat-biblioteca";
         let grupos = [];
         carregarGrupos();
         let biblioteca = carregar();
         let paginaAtual = 1;
         let arquivoHandle = null;
+        let datHandle = null;
 
         const FOTOS_KEY = "biblioteca-fotos";
         let fotos = (() => { try { return JSON.parse(localStorage.getItem(FOTOS_KEY)) || {}; } catch { return {}; } })();
@@ -1481,6 +1486,94 @@
             } catch {}
         }
 
+        async function salvarDatHandleDB(handle) {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readwrite");
+                tx.objectStore(STORE_HANDLES).put(handle, KEY_DAT_HANDLE);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+            } catch (e) { console.warn("Falha ao salvar dat handle:", e); }
+        }
+
+        async function carregarDatHandleDB() {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readonly");
+                return await new Promise((res, rej) => {
+                    const req = tx.objectStore(STORE_HANDLES).get(KEY_DAT_HANDLE);
+                    req.onsuccess = () => res(req.result || null);
+                    req.onerror = () => rej(req.error);
+                });
+            } catch { return null; }
+        }
+
+        // Lê biblioteca.dat vinculado e mescla fotos ausentes no localStorage.
+        async function lerFotosDoDat() {
+            if (!datHandle) return 0;
+            try {
+                const perm = await datHandle.queryPermission({ mode: "readwrite" });
+                if (perm !== "granted") await datHandle.requestPermission({ mode: "readwrite" });
+                const file = await datHandle.getFile();
+                const text = await file.text();
+                if (!text) return 0;
+                const fotosArquivo = JSON.parse(text);
+                let novas = 0;
+                for (const [id, dataUri] of Object.entries(fotosArquivo)) {
+                    if (!fotos[id]) { fotos[id] = dataUri; novas++; }
+                }
+                if (novas > 0) {
+                    localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                    atualizarTudo();
+                }
+                return novas;
+            } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
+        }
+
+        // Grava fotos atuais em biblioteca.dat vinculado.
+        async function gravarFotosNoDat() {
+            if (!datHandle || !SUPORTA_FSA) return;
+            if (Object.keys(fotos).length === 0) return;
+            try {
+                const perm = await datHandle.queryPermission({ mode: "readwrite" });
+                if (perm !== "granted") {
+                    const novo = await datHandle.requestPermission({ mode: "readwrite" });
+                    if (novo !== "granted") return;
+                }
+                const writable = await datHandle.createWritable();
+                await writable.write(JSON.stringify(fotos));
+                await writable.close();
+            } catch (e) { console.error("Erro ao gravar fotos no dat:", e); }
+        }
+
+        // Abre o seletor de arquivo para vincular biblioteca.dat ao Chrome.
+        async function vincularDat() {
+            if (!SUPORTA_FSA) return;
+            try {
+                const opts = { types: [{ description: "Fotos Biblioteca (.dat)", accept: { "application/octet-stream": [".dat"] } }], multiple: false };
+                if (arquivoHandle) opts.startIn = arquivoHandle;
+                const [handle] = await window.showOpenFilePicker(opts);
+                datHandle = handle;
+                await salvarDatHandleDB(handle);
+                const novas = await lerFotosDoDat();
+                toast(`Fotos vinculadas: ${novas} nova(s) importada(s).`, 3500);
+                atualizarBotaoDat();
+            } catch (e) { if (e.name !== "AbortError") toast("Erro ao vincular arquivo de fotos.", 3000); }
+        }
+
+        function atualizarBotaoDat() {
+            const btn = document.getElementById("btn-dat");
+            if (!btn) return;
+            if (datHandle) {
+                btn.textContent = "Fotos: " + datHandle.name;
+                btn.classList.remove("btn-ghost");
+                btn.classList.add("btn-ok");
+            } else {
+                btn.textContent = "Vincular fotos (.dat)";
+                btn.classList.remove("btn-ok");
+                btn.classList.add("btn-ghost");
+            }
+        }
+
         // === File System Access API ===
         async function verificarPermissaoEscrita(handle, solicitar = false) {
             if (!handle || !handle.queryPermission) return false;
@@ -1573,6 +1666,7 @@
                 return;
             }
 
+            const btnDat = document.getElementById("btn-dat");
             if (estado === "ok" && arquivoHandle) {
                 banner.classList.add("sync-ok");
                 const nLivros = biblioteca.length;
@@ -1582,6 +1676,7 @@
                 btnVincular.style.display = "none";
                 btnDesvincular.style.display = "";
                 btnRecarregar.style.display = "";
+                if (btnDat) { btnDat.style.display = ""; atualizarBotaoDat(); }
                 // Complementa (best-effort) com data e tamanho lidos do proprio arquivo.
                 arquivoHandle.getFile().then(f => {
                     const dt = new Date(f.lastModified).toLocaleString("pt-BR", {
@@ -1759,6 +1854,8 @@
                 try { window.__TAURI__.core.invoke("salvar_tsv", { conteudo: serializarTSV() }); } catch(_) {}
                 try { window.__TAURI__.core.invoke("salvar_fotos", { conteudo: JSON.stringify(fotos) }); } catch(_) {}
             }
+            // Modo Chrome com dat vinculado: grava fotos no arquivo .dat (OneDrive)
+            gravarFotosNoDat();
         }
 
         function toast(mensagem, duracao = 2200) {
@@ -3631,6 +3728,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             }
         });
         document.getElementById("btn-recarregar").addEventListener("click", recarregarDoArquivo);
+        document.getElementById("btn-dat").addEventListener("click", vincularDat);
 
         document.querySelectorAll(".btn-add-autor, .btn-add-tema").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -3730,6 +3828,14 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                     ? `Arquivo atualizado: ${importados.length} livro(s) carregado(s) (antes: ${anterior}).`
                     : `${importados.length} livro(s) carregado(s) do arquivo.`;
                 toast(msg, 3500);
+                // Carrega dat handle salvo e importa fotos
+                const datHandleSalvo = await carregarDatHandleDB();
+                if (datHandleSalvo) {
+                    datHandle = datHandleSalvo;
+                    const novas = await lerFotosDoDat();
+                    if (novas > 0) toast(`${novas} foto(s) importada(s) do .dat.`, 3000);
+                    atualizarBotaoDat();
+                }
             } catch {
                 // Falha ou timeout ao ler — mantém dados do localStorage e mostra banner pendente.
                 if (!_startupAborted) atualizarBannerSync("pendente");
