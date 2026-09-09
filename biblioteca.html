@@ -304,6 +304,8 @@
 
         .btn-danger { background: var(--danger); color: #fff; }
         .btn-danger:hover { background: var(--danger-hover); }
+        .btn-ok { background: var(--success, #2a9d5c); color: #fff; }
+        .btn-ok:hover { background: var(--success-hover, #21834c); }
 
         .btn-small {
             font-size: 12px;
@@ -754,6 +756,10 @@
         .sync-ponto-ativo {
             animation: pulso-sync 0.55s ease-out;
         }
+        .thumb-mini { width:44px; height:44px; border-radius:6px; object-fit:cover; display:block; border:1px solid var(--border); cursor:pointer; }
+        .foto-area { display:flex; align-items:flex-start; gap:12px; margin-top:4px; }
+        .foto-preview-capa { width:96px; height:96px; border-radius:8px; object-fit:cover; border:1px solid var(--border); display:block; }
+        .foto-placeholder { width:96px; height:96px; border-radius:8px; border:2px dashed #c8d5ea; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--muted); font-size:11px; cursor:pointer; background:#f8f9fb; text-align:center; padding:8px; gap:4px; user-select:none; }
     </style>
 </head>
 <body>
@@ -763,7 +769,7 @@
                  alt="Biblioteca"
                  style="width:56px; height:56px; border-radius:22%; box-shadow:0 3px 10px rgba(0,0,0,0.25); background:rgba(255,255,255,0.12); padding:5px; flex-shrink:0;">
             <div>
-                <h1>Sistema de Gestao de Biblioteca <span style="font-size:13px;font-weight:400;opacity:0.7;vertical-align:middle;">v.1.7.5</span></h1>
+                <h1>Sistema de Gestao de Biblioteca <span style="font-size:13px;font-weight:400;opacity:0.7;vertical-align:middle;">v.1.8.2</span></h1>
                 <p>Interface web compativel com o arquivo <code>biblioteca.txt</code> (TSV)</p>
             </div>
         </div>
@@ -817,6 +823,21 @@
                             <button type="button" id="btn-gerenciar-grupos-cadastro" style="margin-top:8px;font-size:12px;color:#2b5fb3;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Gerenciar grupos...</button>
                         </div>
                     </div>
+                    <div class="campo-largo">
+                        <label>Foto da capa (opcional)</label>
+                        <div class="foto-area">
+                            <div id="foto-cadastro-placeholder" class="foto-placeholder" onclick="document.getElementById('foto-cadastro-input').click()">
+                                <span style="font-size:24px;">📷</span>
+                                <span>Adicionar foto</span>
+                            </div>
+                            <img id="foto-cadastro-img" class="foto-preview-capa" style="display:none;" alt="Foto da capa">
+                            <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+                                <button type="button" class="btn-ghost btn-small" onclick="document.getElementById('foto-cadastro-input').click()">Selecionar foto…</button>
+                                <button type="button" id="btn-foto-cadastro-remover" class="btn-ghost btn-small" style="display:none;color:#d9534f;">Remover foto</button>
+                            </div>
+                        </div>
+                        <input type="file" id="foto-cadastro-input" accept="image/*" style="display:none;">
+                    </div>
                 </div>
                 <div class="button-row">
                     <button type="submit" class="btn-primary">Cadastrar</button>
@@ -858,6 +879,11 @@
                         <option value="">Todos os livros</option>
                         <option value="qualquer">Qualquer grupo</option>
                     </select>
+                </div>
+                <div class="field" style="flex: 0 0 120px; align-self: flex-end;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-bottom:6px;">
+                        <input type="checkbox" id="filtro-com-foto"> Com foto
+                    </label>
                 </div>
                 <button type="button" id="btn-pesquisar" class="btn-primary">Pesquisar</button>
                 <button type="button" id="btn-limpar-filtros" class="btn-ghost">Limpar filtros</button>
@@ -948,11 +974,13 @@
             </p>
             <div class="button-row">
                 <button type="button" id="btn-vincular" class="btn-primary">Vincular biblioteca.txt</button>
+                <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos">Vincular fotos (.dat)</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
                 <button type="button" id="btn-importar-excel" class="btn-ghost">Importar Excel (Grupo Literatura)</button>
                 <button type="button" id="btn-exportar" class="btn-accent">Exportar (avulso)</button>
+                <button type="button" id="btn-exportar-fotos-dat" class="btn-ghost" title="Salva as fotos em biblioteca.dat — escolha a pasta Biblioteca no iCloud Drive">&#128247; Exportar Fotos → iCloud Drive</button>
                 <button type="button" id="btn-backup" class="btn-ghost">Backup</button>
                 <button type="button" id="btn-limpar-tudo" class="btn-danger">Apagar tudo</button>
                 <button type="button" id="btn-encerrar" class="btn-ghost">Encerrar</button>
@@ -1020,6 +1048,21 @@
                             <div id="edit-grupo-checkboxes" style="display:flex;flex-direction:column;gap:4px;"></div>
                             <button type="button" id="btn-gerenciar-grupos-edicao" style="margin-top:8px;font-size:12px;color:#2b5fb3;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;">Gerenciar grupos...</button>
                         </div>
+                    </div>
+                    <div>
+                        <label>Foto da capa</label>
+                        <div class="foto-area">
+                            <div id="edit-foto-placeholder" class="foto-placeholder" onclick="document.getElementById('edit-foto-input').click()">
+                                <span style="font-size:24px;">📷</span>
+                                <span>Adicionar foto</span>
+                            </div>
+                            <img id="edit-foto-img" class="foto-preview-capa" style="display:none;" alt="Foto da capa">
+                            <div style="display:flex;flex-direction:column;gap:6px;padding-top:4px;">
+                                <button type="button" class="btn-ghost btn-small" onclick="document.getElementById('edit-foto-input').click()">Selecionar foto…</button>
+                                <button type="button" id="btn-edit-foto-remover" class="btn-ghost btn-small" style="display:none;color:#d9534f;">Remover foto</button>
+                            </div>
+                        </div>
+                        <input type="file" id="edit-foto-input" accept="image/*" style="display:none;">
                     </div>
                 </div>
                 <div class="modal-actions">
@@ -1134,11 +1177,65 @@
         const DB_NAME = "biblioteca-handles";
         const STORE_HANDLES = "handles";
         const KEY_HANDLE = "arquivo-biblioteca";
+        const KEY_DAT_HANDLE = "dat-biblioteca";
         let grupos = [];
         carregarGrupos();
         let biblioteca = carregar();
         let paginaAtual = 1;
         let arquivoHandle = null;
+        let datHandle = null;
+
+        const FOTOS_KEY = "biblioteca-fotos";
+        let fotos = (() => { try { return JSON.parse(localStorage.getItem(FOTOS_KEY)) || {}; } catch { return {}; } })();
+        let _fotoPendenteCadastro = null;
+        let _fotoPendenteEdicao = null;
+        let _fotoRemovidaEdicao = false;
+
+        function gerarId(titulo, autores) {
+            // ID determinístico: mesmo livro → mesmo ID em qualquer recarga.
+            const partes = [(titulo || "").toLowerCase().replace(/\s+/g, " ").trim()];
+            if (Array.isArray(autores)) {
+                partes.push(...autores.map(a => (a || "").toLowerCase().replace(/\s+/g, " ").trim()).filter(Boolean).sort());
+            }
+            const chave = partes.join("\x00");
+            let h1 = 2166136261, h2 = 2246822519;
+            for (let i = 0; i < chave.length; i++) {
+                const c = chave.charCodeAt(i);
+                h1 = (Math.imul(h1 ^ c, 16777619)) >>> 0;
+                h2 = (Math.imul(h2 ^ (c + i + 1), 16777619)) >>> 0;
+            }
+            return h1.toString(36) + h2.toString(36);
+        }
+
+        function redimensionarImagem(file, maxPx) {
+            maxPx = maxPx || 200;
+            return new Promise((resolve) => {
+                const img = new Image();
+                const url = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(url);
+                    const escala = Math.min(1, maxPx / Math.max(img.width, img.height, 1));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.round(img.width * escala);
+                    canvas.height = Math.round(img.height * escala);
+                    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL("image/jpeg", 0.82));
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+                img.src = url;
+            });
+        }
+
+        function resetarFotoCadastro() {
+            _fotoPendenteCadastro = null;
+            const img = document.getElementById("foto-cadastro-img");
+            const ph = document.getElementById("foto-cadastro-placeholder");
+            img.src = "";
+            img.style.display = "none";
+            ph.style.display = "";
+            document.getElementById("btn-foto-cadastro-remover").style.display = "none";
+            document.getElementById("foto-cadastro-input").value = "";
+        }
 
         // =====================================================================
         // HELPERS DE MODELO E NORMALIZACAO DE TEXTO
@@ -1178,6 +1275,7 @@
             const temas = obterTemas(livro).map(t => t.toString().trim()).filter(t => t.length > 0);
             livro.autores = autores;
             livro.temas = temas;
+            livro.id = gerarId(livro.titulo, autores);
             livro.comentarios = (livro.comentarios || "").toString();
             livro.local = (livro.local || "").toString();
             if (typeof livro.grupoLiteratura === "boolean") {
@@ -1345,7 +1443,7 @@
                     grupoLiteratura: campos.length >= 8 ? parseGruposStr(campos[7]) : []
                 });
             }
-            return importados;
+            return importados.map(normalizarLivro);
         }
 
         // === IndexedDB para persistir o file handle entre recargas ===
@@ -1386,6 +1484,94 @@
                 const tx = db.transaction(STORE_HANDLES, "readwrite");
                 tx.objectStore(STORE_HANDLES).delete(KEY_HANDLE);
             } catch {}
+        }
+
+        async function salvarDatHandleDB(handle) {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readwrite");
+                tx.objectStore(STORE_HANDLES).put(handle, KEY_DAT_HANDLE);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+            } catch (e) { console.warn("Falha ao salvar dat handle:", e); }
+        }
+
+        async function carregarDatHandleDB() {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readonly");
+                return await new Promise((res, rej) => {
+                    const req = tx.objectStore(STORE_HANDLES).get(KEY_DAT_HANDLE);
+                    req.onsuccess = () => res(req.result || null);
+                    req.onerror = () => rej(req.error);
+                });
+            } catch { return null; }
+        }
+
+        // Lê biblioteca.dat vinculado e mescla fotos ausentes no localStorage.
+        async function lerFotosDoDat() {
+            if (!datHandle) return 0;
+            try {
+                const perm = await datHandle.queryPermission({ mode: "readwrite" });
+                if (perm !== "granted") await datHandle.requestPermission({ mode: "readwrite" });
+                const file = await datHandle.getFile();
+                const text = await file.text();
+                if (!text) return 0;
+                const fotosArquivo = JSON.parse(text);
+                let novas = 0;
+                for (const [id, dataUri] of Object.entries(fotosArquivo)) {
+                    if (!fotos[id]) { fotos[id] = dataUri; novas++; }
+                }
+                if (novas > 0) {
+                    localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                    atualizarTudo();
+                }
+                return novas;
+            } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
+        }
+
+        // Grava fotos atuais em biblioteca.dat vinculado.
+        async function gravarFotosNoDat() {
+            if (!datHandle || !SUPORTA_FSA) return;
+            if (Object.keys(fotos).length === 0) return;
+            try {
+                const perm = await datHandle.queryPermission({ mode: "readwrite" });
+                if (perm !== "granted") {
+                    const novo = await datHandle.requestPermission({ mode: "readwrite" });
+                    if (novo !== "granted") return;
+                }
+                const writable = await datHandle.createWritable();
+                await writable.write(JSON.stringify(fotos));
+                await writable.close();
+            } catch (e) { console.error("Erro ao gravar fotos no dat:", e); }
+        }
+
+        // Abre o seletor de arquivo para vincular biblioteca.dat ao Chrome.
+        async function vincularDat() {
+            if (!SUPORTA_FSA) return;
+            try {
+                const opts = { types: [{ description: "Fotos Biblioteca (.dat)", accept: { "application/octet-stream": [".dat"] } }], multiple: false };
+                if (arquivoHandle) opts.startIn = arquivoHandle;
+                const [handle] = await window.showOpenFilePicker(opts);
+                datHandle = handle;
+                await salvarDatHandleDB(handle);
+                const novas = await lerFotosDoDat();
+                toast(`Fotos vinculadas: ${novas} nova(s) importada(s).`, 3500);
+                atualizarBotaoDat();
+            } catch (e) { if (e.name !== "AbortError") toast("Erro ao vincular arquivo de fotos.", 3000); }
+        }
+
+        function atualizarBotaoDat() {
+            const btn = document.getElementById("btn-dat");
+            if (!btn) return;
+            if (datHandle) {
+                btn.textContent = "Fotos: " + datHandle.name;
+                btn.classList.remove("btn-ghost");
+                btn.classList.add("btn-ok");
+            } else {
+                btn.textContent = "Vincular fotos (.dat)";
+                btn.classList.remove("btn-ok");
+                btn.classList.add("btn-ghost");
+            }
         }
 
         // === File System Access API ===
@@ -1433,6 +1619,36 @@
         }
 
         function atualizarBannerSync(estado) {
+            // Modo nativo macOS: banner fixo mostrando sincronização com iCloud
+            if (window.__BIBLIOTECA_NATIVE__) {
+                const banner = document.getElementById("sync-banner");
+                const msg = document.getElementById("sync-mensagem");
+                if (banner) { banner.className = "sync-banner sync-ok"; }
+                if (msg) { msg.textContent = "Sincronizado com iCloud Drive — alterações salvas automaticamente."; }
+                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                    const b = document.getElementById(id); if (b) b.style.display = "none";
+                });
+                return;
+            }
+
+            // Modo Tauri (Windows): banner fixo mostrando caminho do arquivo (Documents/OneDrive)
+            if (window.__TAURI__) {
+                const banner = document.getElementById("sync-banner");
+                const msg = document.getElementById("sync-mensagem");
+                if (banner) { banner.className = "sync-banner sync-ok"; }
+                if (msg) {
+                    window.__TAURI__.core.invoke("obter_caminho_arquivo").then(caminho => {
+                        if (msg) msg.textContent = `Arquivo: ${caminho} — alterações salvas automaticamente.`;
+                    }).catch(() => {
+                        if (msg) msg.textContent = "Sincronizado — alterações salvas automaticamente.";
+                    });
+                }
+                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                    const b = document.getElementById(id); if (b) b.style.display = "none";
+                });
+                return;
+            }
+
             const banner = document.getElementById("sync-banner");
             const msg = document.getElementById("sync-mensagem");
             const btnVincular = document.getElementById("btn-vincular");
@@ -1450,6 +1666,7 @@
                 return;
             }
 
+            const btnDat = document.getElementById("btn-dat");
             if (estado === "ok" && arquivoHandle) {
                 banner.classList.add("sync-ok");
                 const nLivros = biblioteca.length;
@@ -1459,6 +1676,7 @@
                 btnVincular.style.display = "none";
                 btnDesvincular.style.display = "";
                 btnRecarregar.style.display = "";
+                if (btnDat) { btnDat.style.display = ""; atualizarBotaoDat(); }
                 // Complementa (best-effort) com data e tamanho lidos do proprio arquivo.
                 arquivoHandle.getFile().then(f => {
                     const dt = new Date(f.lastModified).toLocaleString("pt-BR", {
@@ -1622,9 +1840,22 @@
 
         function salvar() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
             if (arquivoHandle) {
                 salvarNoArquivo();
             }
+            // Modo nativo macOS (WKWebView): envia TSV e fotos ao Swift que grava no iCloud
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.exportar.postMessage(serializarTSV()); } catch(_) {}
+                try { window.webkit.messageHandlers.fotos.postMessage(JSON.stringify(fotos)); } catch(_) {}
+            }
+            // Modo Tauri (Windows): grava TSV e fotos diretamente em Documents via Rust
+            if (window.__TAURI__) {
+                try { window.__TAURI__.core.invoke("salvar_tsv", { conteudo: serializarTSV() }); } catch(_) {}
+                try { window.__TAURI__.core.invoke("salvar_fotos", { conteudo: JSON.stringify(fotos) }); } catch(_) {}
+            }
+            // Modo Chrome com dat vinculado: grava fotos no arquivo .dat (OneDrive)
+            gravarFotosNoDat();
         }
 
         function toast(mensagem, duracao = 2200) {
@@ -1642,6 +1873,7 @@
             const lc = normalizar(document.getElementById("filtro-local").value);
             const status = document.getElementById("filtro-status").value;
             const filtroGrupo = document.getElementById("filtro-grupo").value;
+            const filtroComFoto = document.getElementById("filtro-com-foto").checked;
 
             return biblioteca
                 .map((livro, indice) => ({ livro, indice }))
@@ -1657,6 +1889,7 @@
                         const id = parseInt(filtroGrupo, 10);
                         if (!Array.isArray(livro.grupoLiteratura) || !livro.grupoLiteratura.includes(id)) return false;
                     }
+                    if (filtroComFoto && !fotos[livro.id]) return false;
                     return true;
                 });
         }
@@ -1741,8 +1974,13 @@
                 const cellGrupo = nomesG
                     ? `<td style="font-size:12px;color:#166b48;" title="${escapeHtml(nomesG)}">&#10003; ${escapeHtml(nomesG)}</td>`
                     : `<td style="text-align:center;color:#cbd2dc;">—</td>`;
+                const fotoSrc = livro.id ? fotos[livro.id] : null;
+                const cellFoto = fotoSrc
+                    ? `<td style="text-align:center;padding:4px 2px;"><img src="${fotoSrc}" class="thumb-mini" onclick="abrirEdicao(${indice})" title="Clique para editar"></td>`
+                    : `<td style="text-align:center;padding:4px 2px;"><div onclick="abrirEdicao(${indice})" title="Sem foto — clique para adicionar" style="width:44px;height:44px;border-radius:6px;border:1.5px dashed #c8d5ea;background:#f4f6f9;display:flex;align-items:center;justify-content:center;cursor:pointer;margin:0 auto;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="#2B5FB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="#2B5FB3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/></svg></div></td>`;
                 return `
                 <tr class="${classeGrupo}">
+                    ${cellFoto}
                     <td>${escapeHtml(livro.titulo)}</td>
                     <td>${escapeHtml(autoresParaTexto(livro))}</td>
                     <td>${escapeHtml(temasParaTexto(livro))}</td>
@@ -1772,6 +2010,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width:52px;text-align:center;">Foto</th>
                             <th>Titulo</th>
                             <th>Autor</th>
                             <th>Tema</th>
@@ -2218,11 +2457,14 @@
             const participa = document.getElementById("grupo-participa").checked;
             const grupoLiteratura = participa ? lerGruposSelecionados("grupo-checkboxes") : [];
             const livro = { titulo, autores, temas, ano, emprestado: false, comentarios, local, grupoLiteratura };
+            normalizarLivro(livro);
+            if (_fotoPendenteCadastro) { fotos[livro.id] = _fotoPendenteCadastro; }
             biblioteca.push(livro);
             salvar();
             paginaAtual = Math.ceil(biblioteca.length / LIVROS_POR_PAGINA);
             atualizarTudo();
             e.target.reset();
+            resetarFotoCadastro();
             document.getElementById("grupo-participa").checked = false;
             document.getElementById("grupo-multi").style.display = "none";
             popularCampos("autores-container", [], "autor");
@@ -2234,10 +2476,57 @@
 
         document.getElementById("btn-limpar-cadastro").addEventListener("click", () => {
             document.getElementById("form-cadastro").reset();
+            resetarFotoCadastro();
             document.getElementById("grupo-participa").checked = false;
             document.getElementById("grupo-multi").style.display = "none";
             popularCampos("autores-container", [], "autor");
             popularCampos("temas-container", [], "tema");
+        });
+
+        // === Fotos ===
+        document.getElementById("foto-cadastro-input").addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const dataUrl = await redimensionarImagem(file, 200);
+            if (!dataUrl) { toast("Erro ao processar a imagem."); return; }
+            _fotoPendenteCadastro = dataUrl;
+            const img = document.getElementById("foto-cadastro-img");
+            const ph = document.getElementById("foto-cadastro-placeholder");
+            img.src = dataUrl;
+            img.style.display = "";
+            ph.style.display = "none";
+            document.getElementById("btn-foto-cadastro-remover").style.display = "";
+        });
+
+        document.getElementById("btn-foto-cadastro-remover").addEventListener("click", () => {
+            resetarFotoCadastro();
+        });
+
+        document.getElementById("edit-foto-input").addEventListener("change", async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const dataUrl = await redimensionarImagem(file, 200);
+            if (!dataUrl) { toast("Erro ao processar a imagem."); return; }
+            _fotoPendenteEdicao = dataUrl;
+            _fotoRemovidaEdicao = false;
+            const img = document.getElementById("edit-foto-img");
+            const ph = document.getElementById("edit-foto-placeholder");
+            img.src = dataUrl;
+            img.style.display = "";
+            ph.style.display = "none";
+            document.getElementById("btn-edit-foto-remover").style.display = "";
+        });
+
+        document.getElementById("btn-edit-foto-remover").addEventListener("click", () => {
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = true;
+            const img = document.getElementById("edit-foto-img");
+            const ph = document.getElementById("edit-foto-placeholder");
+            img.src = "";
+            img.style.display = "none";
+            ph.style.display = "";
+            document.getElementById("btn-edit-foto-remover").style.display = "none";
+            document.getElementById("edit-foto-input").value = "";
         });
 
         // === Filtros ===
@@ -2245,11 +2534,7 @@
             paginaAtual = 1;
             const resultados = aplicarFiltros();
             renderizar();
-            const temFiltro = ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].some(id => document.getElementById(id).value.trim())
-                || document.getElementById("filtro-status").value !== "todos";
-            if (temFiltro) {
-                toast(`${resultados.length} livro(s) encontrado(s).`);
-            }
+            toast(`${resultados.length} livro(s) encontrado(s).`);
         }
 
         document.getElementById("btn-pesquisar").addEventListener("click", executarPesquisa);
@@ -2278,6 +2563,7 @@
             ["filtro-titulo", "filtro-autor", "filtro-tema", "filtro-local"].forEach(id => document.getElementById(id).value = "");
             document.getElementById("filtro-status").value = "todos";
             document.getElementById("filtro-grupo").value = "";
+            document.getElementById("filtro-com-foto").checked = false;
             paginaAtual = 1;
             renderizar();
         });
@@ -2335,6 +2621,7 @@
                 case "imprimir": imprimirLivro(livro); break;
                 case "remover":
                     if (confirm(`Remover o livro "${livro.titulo}"?`)) {
+                        if (livro.id) delete fotos[livro.id];
                         biblioteca.splice(indice, 1);
                         salvar(); atualizarTudo();
                         toast("Livro removido.");
@@ -2359,6 +2646,25 @@
             document.getElementById("edit-grupo-participa").checked = editParticipa;
             document.getElementById("edit-grupo-multi").style.display = editParticipa ? "" : "none";
             preencherCheckboxesGrupo("edit-grupo-checkboxes", gruposSel);
+            if (!livro.id) livro.id = gerarId(livro.titulo, livro.autores);
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = false;
+            const fotoAtual = fotos[livro.id] || null;
+            const eEditFotoImg = document.getElementById("edit-foto-img");
+            const eEditFotoPh = document.getElementById("edit-foto-placeholder");
+            const eEditFotoRem = document.getElementById("btn-edit-foto-remover");
+            if (fotoAtual) {
+                eEditFotoImg.src = fotoAtual;
+                eEditFotoImg.style.display = "";
+                eEditFotoPh.style.display = "none";
+                eEditFotoRem.style.display = "";
+            } else {
+                eEditFotoImg.src = "";
+                eEditFotoImg.style.display = "none";
+                eEditFotoPh.style.display = "";
+                eEditFotoRem.style.display = "none";
+            }
+            document.getElementById("edit-foto-input").value = "";
             document.getElementById("modal-backdrop").classList.add("active");
         }
 
@@ -2419,17 +2725,31 @@
                 }
             }
 
+            const _oldFotoId = livro.id;
             livro.titulo = novoTitulo;
             livro.autores = autores;
             livro.temas = temas;
             delete livro.autor;
             delete livro.tema;
+            livro.id = gerarId(livro.titulo, livro.autores);
             livro.ano = parseInt(document.getElementById("edit-ano").value, 10);
             livro.emprestado = document.getElementById("edit-emprestado").value === "1";
             livro.local = document.getElementById("edit-local").value.trim();
             livro.comentarios = document.getElementById("edit-comentarios").value.trim();
             const editParticipa = document.getElementById("edit-grupo-participa").checked;
             livro.grupoLiteratura = editParticipa ? lerGruposSelecionados("edit-grupo-checkboxes") : [];
+            if (_fotoPendenteEdicao) {
+                fotos[livro.id] = _fotoPendenteEdicao;
+                if (_oldFotoId !== livro.id) delete fotos[_oldFotoId];
+            } else if (_fotoRemovidaEdicao) {
+                delete fotos[_oldFotoId];
+                delete fotos[livro.id];
+            } else if (_oldFotoId !== livro.id && fotos[_oldFotoId]) {
+                fotos[livro.id] = fotos[_oldFotoId];
+                delete fotos[_oldFotoId];
+            }
+            _fotoPendenteEdicao = null;
+            _fotoRemovidaEdicao = false;
             salvar();
             atualizarTudo();
             fecharEdicao();
@@ -3105,6 +3425,16 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             }
             const conteudo = serializarTSV();
 
+            // Ponte nativa: app macOS (WKWebView). O Swift recebe o conteudo e mostra NSSavePanel.
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    await window.webkit.messageHandlers.exportar.postMessage(conteudo);
+                } catch (e) {
+                    toast("Erro ao exportar.");
+                }
+                return true;
+            }
+
             // Tenta showSaveFilePicker para o usuario poder escolher a pasta de destino
             // (util no Windows ou em VMs onde o arquivo nao fica na pasta Downloads).
             if ("showSaveFilePicker" in window) {
@@ -3138,7 +3468,59 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
 
         document.getElementById("btn-exportar").addEventListener("click", exportarArquivo);
 
+        document.getElementById("btn-exportar-fotos-dat").addEventListener("click", async () => {
+            // 1. Fotos do Chrome (localStorage)
+            const raw = localStorage.getItem("biblioteca-fotos");
+            const fotosChrome = raw ? JSON.parse(raw) : {};
+            if (Object.keys(fotosChrome).length === 0) { alert("Nenhuma foto encontrada no Chrome."); return; }
+
+            try {
+                // 2. Abre o biblioteca.dat existente para fazer merge
+                let fotosExistentes = {};
+                try {
+                    const [readHandle] = await window.showOpenFilePicker({
+                        id: "dat-merge",
+                        startIn: "downloads",
+                        types: [{ description: "biblioteca.dat", accept: { "application/json": [".dat"] } }]
+                    });
+                    const texto = await (await readHandle.getFile()).text();
+                    fotosExistentes = JSON.parse(texto);
+                } catch (e) {
+                    if (e.name !== "AbortError") { /* dat não existe ainda — ok */ }
+                    else return; // usuário cancelou
+                }
+
+                // 3. Merge: dat existente + fotos do Chrome (Chrome ganha em conflito)
+                const merged = Object.assign({}, fotosExistentes, fotosChrome);
+                const total = Object.keys(merged).length;
+
+                // 4. Salva o resultado
+                const saveHandle = await window.showSaveFilePicker({
+                    suggestedName: "biblioteca.dat",
+                    types: [{ description: "biblioteca.dat", accept: { "application/json": [".dat"] } }]
+                });
+                const writable = await saveHandle.createWritable();
+                await writable.write(JSON.stringify(merged));
+                await writable.close();
+                alert(total + " foto(s) no arquivo final.\nSalve na pasta Biblioteca no iCloud Drive.");
+            } catch (e) {
+                if (e.name !== "AbortError") alert("Erro: " + e.message);
+            }
+        });
+
         async function encerrarInterface() {
+            // Modo nativo macOS: encerra via ponte Swift.
+            // Testa a presença do handler diretamente, independente da injeção de __BIBLIOTECA_NATIVE__.
+            if (window.__BIBLIOTECA_NATIVE__ || window.webkit?.messageHandlers?.fechar) {
+                try { window.webkit.messageHandlers.fechar.postMessage(null); } catch(_) {}
+                return;
+            }
+            // Modo Tauri (Windows): encerra via Rust
+            if (window.__TAURI__) {
+                try { await window.__TAURI__.core.invoke("fechar_janela"); } catch(_) {}
+                return;
+            }
+
             // Salvar no arquivo vinculado (se houver) e avisar o usuario
             if (arquivoHandle && biblioteca.length > 0) {
                 const ok = await salvarNoArquivo();
@@ -3346,6 +3728,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             }
         });
         document.getElementById("btn-recarregar").addEventListener("click", recarregarDoArquivo);
+        document.getElementById("btn-dat").addEventListener("click", vincularDat);
 
         document.querySelectorAll(".btn-add-autor, .btn-add-tema").forEach(btn => {
             btn.addEventListener("click", () => {
@@ -3374,6 +3757,42 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         }, 4000);
 
         (async () => {
+            if (window.__BIBLIOTECA_NATIVE__) return; // dados injetados pelo Swift via WKWebView
+
+            // Modo Tauri (Windows): carrega TSV e fotos diretamente do arquivo em Documents
+            if (window.__TAURI__) {
+                try {
+                    // Diagnóstico: mostra onde o app encontrou (ou não) os arquivos
+                    const diag = await window.__TAURI__.core.invoke("diagnosticar");
+                    console.info("[Tauri] " + diag);
+                    toast(diag, 6000);
+
+                    const tsv = await window.__TAURI__.core.invoke("carregar_tsv");
+                    if (tsv) {
+                        const importados = parseTSV(tsv);
+                        biblioteca = importados;
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+                        paginaAtual = 1;
+                    }
+                    const fotosJson = await window.__TAURI__.core.invoke("carregar_fotos");
+                    if (fotosJson) {
+                        try {
+                            const fotosArquivo = JSON.parse(fotosJson);
+                            fotos = Object.assign({}, fotos, fotosArquivo);
+                            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                        } catch(_) {}
+                    }
+                    atualizarTudo();
+                    atualizarBannerSync("ok");
+                    setTimeout(() => toast(`${biblioteca.length} livro(s) e ${Object.keys(fotos).length} foto(s) carregado(s).`, 4000), 6500);
+                } catch(e) {
+                    console.error("Tauri load error:", e);
+                    toast("Erro Tauri: " + e, 6000);
+                    atualizarBannerSync("ok");
+                }
+                return;
+            }
+
             if (!SUPORTA_FSA) {
                 atualizarBannerSync("nao-suportado");
                 return;
@@ -3409,6 +3828,14 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                     ? `Arquivo atualizado: ${importados.length} livro(s) carregado(s) (antes: ${anterior}).`
                     : `${importados.length} livro(s) carregado(s) do arquivo.`;
                 toast(msg, 3500);
+                // Carrega dat handle salvo e importa fotos
+                const datHandleSalvo = await carregarDatHandleDB();
+                if (datHandleSalvo) {
+                    datHandle = datHandleSalvo;
+                    const novas = await lerFotosDoDat();
+                    if (novas > 0) toast(`${novas} foto(s) importada(s) do .dat.`, 3000);
+                    atualizarBotaoDat();
+                }
             } catch {
                 // Falha ou timeout ao ler — mantém dados do localStorage e mostra banner pendente.
                 if (!_startupAborted) atualizarBannerSync("pendente");
@@ -3417,8 +3844,9 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
 
         // ── Aviso de compatibilidade com navegador ──────────────────────────
         (function verificarNavegador() {
-            // No app instalável (Tauri) não há restrições de navegador
+            // No app instalável (Tauri ou WKWebView nativo) não há restrições de navegador
             if (window.__TAURI__) return;
+            if (window.__BIBLIOTECA_NATIVE__) return;
 
             const CHAVE_AVISO = "biblioteca-aviso-navegador-dispensado";
             if (localStorage.getItem(CHAVE_AVISO) === "1") return;
