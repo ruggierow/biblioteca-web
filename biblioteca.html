@@ -3818,6 +3818,10 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 return;
             }
             arquivoHandle = handleSalvo;
+            // Restaura datHandle antes de qualquer retorno antecipado: Reativar Permissão
+            // precisa encontrá-lo mesmo quando a permissão do .txt ainda não foi concedida.
+            const datHandleSalvo = await carregarDatHandleDB();
+            if (datHandleSalvo) { datHandle = datHandleSalvo; atualizarBotaoDat(); }
             const temPermissao = await verificarPermissaoEscrita(handleSalvo, false);
             if (_startupAborted) { arquivoHandle = null; return; }
             if (!temPermissao) {
@@ -3842,14 +3846,9 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                     ? `Arquivo atualizado: ${importados.length} livro(s) carregado(s) (antes: ${anterior}).`
                     : `${importados.length} livro(s) carregado(s) do arquivo.`;
                 toast(msg, 3500);
-                // Carrega dat handle salvo e importa fotos
-                const datHandleSalvo = await carregarDatHandleDB();
-                if (datHandleSalvo) {
-                    datHandle = datHandleSalvo;
-                    const novas = await lerFotosDoDat();
-                    if (novas > 0) toast(`${novas} foto(s) importada(s) do .dat.`, 3000);
-                    atualizarBotaoDat();
-                }
+                // datHandle já restaurado acima — importa fotos se permissão já ativa
+                const novas = await lerFotosDoDat();
+                if (novas > 0) { toast(`${novas} foto(s) importada(s) do .dat.`, 3000); atualizarTudo(); }
             } catch {
                 // Falha ou timeout ao ler — mantém dados do localStorage e mostra banner pendente.
                 if (!_startupAborted) atualizarBannerSync("pendente");
