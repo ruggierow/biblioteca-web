@@ -1517,15 +1517,15 @@
                 const text = await file.text();
                 if (!text) return 0;
                 const fotosArquivo = JSON.parse(text);
-                let novas = 0;
+                let total = 0;
                 for (const [id, dataUri] of Object.entries(fotosArquivo)) {
-                    if (!fotos[id]) { fotos[id] = dataUri; novas++; }
+                    fotos[id] = dataUri; // sempre atualiza — não só fotos ausentes
+                    total++;
                 }
-                if (novas > 0) {
+                if (total > 0) {
                     localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-                    atualizarTudo();
                 }
-                return novas;
+                return total;
             } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
         }
 
@@ -1793,25 +1793,32 @@
 
         async function reativarPermissao() {
             if (!arquivoHandle) { vincularArquivo(); return; }
-            if (await verificarPermissaoEscrita(arquivoHandle, true)) {
+            // Pede permissão do .txt dentro do gesto do usuário
+            const permTxt = await verificarPermissaoEscrita(arquivoHandle, true);
+            if (!permTxt) { toast("Permissao nao concedida."); return; }
+            // Pede permissão do .dat também, ainda dentro do mesmo gesto
+            if (datHandle) {
                 try {
-                    const file = await arquivoHandle.getFile();
-                    const importados = parseTSV(await file.text());
-                    biblioteca = importados;
-                    salvar();
-                    paginaAtual = 1;
-                    atualizarTudo();
-                    atualizarBannerSync("ok");
-                    const novasFotos = await lerFotosDoDat();
-                    if (novasFotos > 0) atualizarTudo();
-                    const msgFotos = novasFotos > 0 ? ` + ${novasFotos} foto(s) nova(s).` : "";
-                    toast(`Permissao reativada — ${importados.length} livro(s) carregado(s).${msgFotos}`, 3500);
-                } catch {
-                    atualizarBannerSync("ok");
-                    toast("Permissao reativada.");
-                }
-            } else {
-                toast("Permissao nao concedida.");
+                    const pd = await datHandle.queryPermission({ mode: "readwrite" });
+                    if (pd !== "granted") await datHandle.requestPermission({ mode: "readwrite" });
+                } catch(e) { console.error("Erro ao reativar permissao do .dat:", e); }
+            }
+            try {
+                const file = await arquivoHandle.getFile();
+                const importados = parseTSV(await file.text());
+                biblioteca = importados;
+                salvar();
+                paginaAtual = 1;
+                atualizarTudo();
+                atualizarBannerSync("ok");
+                const totalFotos = await lerFotosDoDat();
+                if (totalFotos > 0) atualizarTudo();
+                const nomeDat = datHandle ? ` (${datHandle.name})` : "";
+                const msgFotos = datHandle ? ` · ${totalFotos} foto(s) do .dat${nomeDat}.` : "";
+                toast(`Permissao reativada — ${importados.length} livro(s).${msgFotos}`, 4500);
+            } catch {
+                atualizarBannerSync("ok");
+                toast("Permissao reativada.");
             }
         }
 
@@ -1835,10 +1842,11 @@
                 paginaAtual = 1;
                 atualizarTudo();
                 atualizarBannerSync("ok");
-                const novasFotos = await lerFotosDoDat();
-                if (novasFotos > 0) atualizarTudo();
-                const msgFotos = novasFotos > 0 ? ` + ${novasFotos} foto(s) nova(s).` : "";
-                toast(`${importados.length} livro(s) recarregado(s) do arquivo.${msgFotos}`);
+                const totalFotos = await lerFotosDoDat();
+                if (totalFotos > 0) atualizarTudo();
+                const nomeDat = datHandle ? ` (${datHandle.name})` : "";
+                const msgFotos = datHandle ? ` · ${totalFotos} foto(s) do .dat${nomeDat}.` : "";
+                toast(`${importados.length} livro(s) recarregado(s).${msgFotos}`);
             } catch (e) {
                 toast("Erro ao recarregar o arquivo.");
             }
