@@ -6,6 +6,8 @@
 	<string>Biblioteca Web</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.ruggierow.biblioteca-web</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleName</key>
 	<string>Biblioteca Web</string>
 	<key>CFBundlePackageType</key>

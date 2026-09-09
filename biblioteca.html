@@ -1802,7 +1802,10 @@
                     paginaAtual = 1;
                     atualizarTudo();
                     atualizarBannerSync("ok");
-                    toast(`Permissao reativada — ${importados.length} livro(s) carregado(s) do arquivo.`, 3500);
+                    const novasFotos = await lerFotosDoDat();
+                    if (novasFotos > 0) atualizarTudo();
+                    const msgFotos = novasFotos > 0 ? ` + ${novasFotos} foto(s) nova(s).` : "";
+                    toast(`Permissao reativada — ${importados.length} livro(s) carregado(s).${msgFotos}`, 3500);
                 } catch {
                     atualizarBannerSync("ok");
                     toast("Permissao reativada.");
@@ -1832,7 +1835,10 @@
                 paginaAtual = 1;
                 atualizarTudo();
                 atualizarBannerSync("ok");
-                toast(`${importados.length} livro(s) recarregado(s) do arquivo.`);
+                const novasFotos = await lerFotosDoDat();
+                if (novasFotos > 0) atualizarTudo();
+                const msgFotos = novasFotos > 0 ? ` + ${novasFotos} foto(s) nova(s).` : "";
+                toast(`${importados.length} livro(s) recarregado(s) do arquivo.${msgFotos}`);
             } catch (e) {
                 toast("Erro ao recarregar o arquivo.");
             }

@@ -24,6 +24,8 @@ targets:
           - "*.entitlements"
       - path: Sources/BibliotecaMacWeb/Resources/biblioteca.html
         buildPhase: resources
+      - path: Sources/BibliotecaMacWeb/Resources/AppIcon.icns
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ruggierow.biblioteca-web

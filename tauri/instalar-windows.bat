@@ -82,8 +82,24 @@ if errorlevel 1 (
 
 echo.
 echo === Pronto! ===
-echo O instalador foi gerado em:
-echo   %~dp0src-tauri\target\release\bundle\msi\
+
+REM Localiza o instalador NSIS gerado
+set BUNDLE=%~dp0src-tauri\target\release\bundle
+set NSIS_DIR=%BUNDLE%\nsis
+set MSI_DIR=%BUNDLE%\msi
+
+echo Instalador gerado em:
+if exist "%NSIS_DIR%" (
+    echo   %NSIS_DIR%
+    REM Abre a pasta no Explorer para facilitar copiar para o Mac
+    explorer "%NSIS_DIR%"
+) else if exist "%MSI_DIR%" (
+    echo   %MSI_DIR%
+    explorer "%MSI_DIR%"
+)
+
 echo.
-echo Execute o arquivo .msi para instalar o Biblioteca no Windows.
+echo Arraste o arquivo .exe (ou .msi) para o Mac e coloque em:
+echo   motor-web/windows/Biblioteca-setup.exe
+echo Depois rode ./bin/empacotar.sh no Mac para gerar o zip de distribuicao.
 pause
