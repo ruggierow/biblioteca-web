@@ -1554,9 +1554,24 @@
                 const [handle] = await window.showOpenFilePicker(opts);
                 datHandle = handle;
                 await salvarDatHandleDB(handle);
-                const novas = await lerFotosDoDat();
-                toast(`Fotos vinculadas: ${novas} nova(s) importada(s).`, 3500);
+                const totalFotos = await lerFotosDoDat();
+                if (totalFotos > 0) atualizarTudo();
                 atualizarBotaoDat();
+                // Aproveita o gesto para recarregar o .txt se já tiver permissão ativa
+                if (arquivoHandle && (await verificarPermissaoEscrita(arquivoHandle, false))) {
+                    try {
+                        const file = await arquivoHandle.getFile();
+                        const importados = parseTSV(await file.text());
+                        biblioteca = importados;
+                        salvar();
+                        paginaAtual = 1;
+                        atualizarTudo();
+                        atualizarBannerSync("ok");
+                        toast(`${importados.length} livro(s) e ${totalFotos} foto(s) carregado(s).`, 4000);
+                        return;
+                    } catch(e) {}
+                }
+                toast(`Fotos vinculadas: ${totalFotos} foto(s).`, 3500);
             } catch (e) { if (e.name !== "AbortError") toast("Erro ao vincular arquivo de fotos.", 3000); }
         }
 
@@ -1793,14 +1808,30 @@
 
         async function reativarPermissao() {
             if (!arquivoHandle) { vincularArquivo(); return; }
-            // Pede permissão do .txt dentro do gesto do usuário
+            // Pede permissão do .txt (gesto do usuário → Chrome mostra "Save changes")
             const permTxt = await verificarPermissaoEscrita(arquivoHandle, true);
             if (!permTxt) { toast("Permissao nao concedida."); return; }
-            // Pede permissão do .dat também, ainda dentro do mesmo gesto
+            // Tenta restaurar permissão do .dat com requestPermission.
+            // Se não funcionar (Chrome no Windows não mostra diálogo para handles salvos),
+            // abre o seletor para o usuário re-selecionar o mesmo arquivo .dat.
             if (datHandle) {
                 try {
                     const pd = await datHandle.queryPermission({ mode: "readwrite" });
-                    if (pd !== "granted") await datHandle.requestPermission({ mode: "readwrite" });
+                    if (pd !== "granted") {
+                        const rp = await datHandle.requestPermission({ mode: "readwrite" });
+                        if (rp !== "granted") {
+                            // requestPermission falhou: abre seletor para re-vincular .dat
+                            toast("Selecione o arquivo de fotos (.dat) para reautorizar.", 4000);
+                            try {
+                                const opts = { types: [{ description: "Fotos Biblioteca (.dat)", accept: { "application/octet-stream": [".dat"] } }], multiple: false };
+                                if (arquivoHandle) opts.startIn = arquivoHandle;
+                                const [novoHandle] = await window.showOpenFilePicker(opts);
+                                datHandle = novoHandle;
+                                await salvarDatHandleDB(novoHandle);
+                                atualizarBotaoDat();
+                            } catch(e) { if (e.name !== "AbortError") console.warn("Seletor .dat cancelado:", e); }
+                        }
+                    }
                 } catch(e) { console.error("Erro ao reativar permissao do .dat:", e); }
             }
             try {
