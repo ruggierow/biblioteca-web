@@ -2,21 +2,46 @@ use std::fs;
 use std::path::PathBuf;
 
 /// Caminho para biblioteca.txt.
-/// No Windows, dirs::document_dir() já segue o redirecionamento do OneDrive
-/// automaticamente (aponta para a pasta Documents real do usuário).
+/// Procura primeiro em Documents\Biblioteca\ (pasta padrão do app),
+/// depois em Documents\ (raiz). O dirs::document_dir() já segue o
+/// redirecionamento do OneDrive automaticamente no Windows.
 fn caminho_base() -> PathBuf {
     if let Some(docs) = dirs::document_dir() {
-        let p = docs.join("biblioteca.txt");
-        return p;
+        let em_pasta = docs.join("Biblioteca").join("biblioteca.txt");
+        if em_pasta.exists() { return em_pasta; }
+        return docs.join("biblioteca.txt");
     }
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("biblioteca.txt")
 }
 
-/// Caminho para biblioteca.dat — mesmo diretório que biblioteca.txt.
+/// Caminho para biblioteca.dat.
+/// Procura em: mesmo dir que txt → Documents\Biblioteca\ → Documents\.
 fn caminho_dat() -> PathBuf {
-    caminho_base().with_extension("dat")
+    let junto_txt = caminho_base().with_extension("dat");
+    if junto_txt.exists() { return junto_txt; }
+    if let Some(docs) = dirs::document_dir() {
+        let em_pasta = docs.join("Biblioteca").join("biblioteca.dat");
+        if em_pasta.exists() { return em_pasta; }
+        let na_raiz = docs.join("biblioteca.dat");
+        if na_raiz.exists() { return na_raiz; }
+    }
+    junto_txt
+}
+
+/// Retorna diagnóstico: onde os arquivos foram encontrados (ou não).
+#[tauri::command]
+fn diagnosticar() -> String {
+    let txt = caminho_base();
+    let dat = caminho_dat();
+    format!(
+        "TXT: {} [{}]\nDAT: {} [{}]",
+        txt.display(),
+        if txt.exists() { "encontrado" } else { "NÃO encontrado" },
+        dat.display(),
+        if dat.exists() { "encontrado" } else { "NÃO encontrado" }
+    )
 }
 
 /// Lê o TSV completo e retorna como string. Retorna "" se o arquivo não existir.
@@ -93,6 +118,7 @@ pub fn run() {
             obter_caminho_arquivo,
             fazer_backup,
             fechar_janela,
+            diagnosticar,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");

@@ -3664,6 +3664,11 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             // Modo Tauri (Windows): carrega TSV e fotos diretamente do arquivo em Documents
             if (window.__TAURI__) {
                 try {
+                    // Diagnóstico: mostra onde o app encontrou (ou não) os arquivos
+                    const diag = await window.__TAURI__.core.invoke("diagnosticar");
+                    console.info("[Tauri] " + diag);
+                    toast(diag, 6000);
+
                     const tsv = await window.__TAURI__.core.invoke("carregar_tsv");
                     if (tsv) {
                         const importados = parseTSV(tsv);
@@ -3681,9 +3686,10 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                     }
                     atualizarTudo();
                     atualizarBannerSync("ok");
-                    toast(`${biblioteca.length} livro(s) carregado(s).`, 3000);
+                    setTimeout(() => toast(`${biblioteca.length} livro(s) e ${Object.keys(fotos).length} foto(s) carregado(s).`, 4000), 6500);
                 } catch(e) {
                     console.error("Tauri load error:", e);
+                    toast("Erro Tauri: " + e, 6000);
                     atualizarBannerSync("ok");
                 }
                 return;
