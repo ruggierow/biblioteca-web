@@ -10,7 +10,7 @@ SetCompressor /SOLID lzma
 !include "FileFunc.nsh"
 
 !define APP_NAME        "Biblioteca"
-!define APP_VERSION     "1.8.2"
+!define APP_VERSION     "1.8.3"
 !define APP_PUBLISHER   "Wilson"
 !define APP_ICON        "biblioteca.ico"
 !define INSTALL_DIR     "$LOCALAPPDATA\Biblioteca"

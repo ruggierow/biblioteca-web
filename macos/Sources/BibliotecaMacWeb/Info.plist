@@ -4,16 +4,16 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>Biblioteca Web</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.ruggierow.biblioteca-web</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.ruggierow.biblioteca-web</string>
 	<key>CFBundleName</key>
 	<string>Biblioteca Web</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8.2</string>
+	<string>1.8.3</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>

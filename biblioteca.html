@@ -769,7 +769,7 @@
                  alt="Biblioteca"
                  style="width:56px; height:56px; border-radius:22%; box-shadow:0 3px 10px rgba(0,0,0,0.25); background:rgba(255,255,255,0.12); padding:5px; flex-shrink:0;">
             <div>
-                <h1>Sistema de Gestao de Biblioteca <span style="font-size:13px;font-weight:400;opacity:0.7;vertical-align:middle;">v.1.8.2</span></h1>
+                <h1>Sistema de Gestao de Biblioteca <span style="font-size:13px;font-weight:400;opacity:0.7;vertical-align:middle;">v.1.8.3</span></h1>
                 <p>Interface web compativel com o arquivo <code>biblioteca.txt</code> (TSV)</p>
             </div>
         </div>
@@ -975,6 +975,7 @@
             <div class="button-row">
                 <button type="button" id="btn-vincular" class="btn-primary">Vincular biblioteca.txt</button>
                 <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos">Vincular fotos (.dat)</button>
+                <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca">Fotos orfas</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
@@ -1074,6 +1075,22 @@
     </div>
 
     <!-- Modal de grupos de literatura -->
+    <!-- Modal de fotos orfas -->
+    <div id="modal-fotos-orfas" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.55); z-index:9012; align-items:center; justify-content:center; padding:20px;">
+        <div style="background:#fff; border-radius:12px; padding:24px; max-width:500px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h3 style="margin:0; font-size:16px; color:#1e3a5f;">Fotos sem livro</h3>
+                <button type="button" class="btn-ghost" id="btn-fechar-fotos-orfas">&#10005;</button>
+            </div>
+            <p style="font-size:12px; color:#6b7280; margin:0 0 14px; line-height:1.5;">O codigo abaixo de cada foto e o identificador derivado de titulo + autores. Essas fotos existem no arquivo .dat mas nao correspondem a nenhum livro na biblioteca atual.</p>
+            <div id="fotos-orfas-lista" style="max-height:380px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
+            <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
+                <button type="button" id="btn-excluir-todas-orfas" class="btn-ghost" style="color:#dc2626;">Excluir todas</button>
+                <button type="button" id="btn-fechar-fotos-orfas2" class="btn-ghost">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-grupos" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.55); z-index:9010; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:12px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
             <h3 style="margin:0 0 4px; font-size:16px; color:#1e3a5f;">Grupos de Literatura</h3>
@@ -1514,11 +1531,18 @@
             try {
                 // Apenas leitura: "read" já é concedido por showOpenFilePicker; "readwrite" falha
                 const perm = await datHandle.queryPermission({ mode: "read" });
-                if (perm !== "granted") await datHandle.requestPermission({ mode: "read" });
+                if (perm !== "granted") {
+                    const rp = await datHandle.requestPermission({ mode: "read" });
+                    if (rp !== "granted") {
+                        const recheck = await datHandle.queryPermission({ mode: "read" });
+                        if (recheck !== "granted") return 0;
+                    }
+                }
                 const file = await datHandle.getFile();
                 const text = await file.text();
-                if (!text) return 0;
-                const fotosArquivo = JSON.parse(text);
+                const fotosArquivo = text ? JSON.parse(text) : {};
+                // Dat lido com sucesso (mesmo se vazio) — libera gravarFotosNoDat
+                _datLidoNestaSessao = true;
                 let total = 0;
                 for (const [id, dataUri] of Object.entries(fotosArquivo)) {
                     fotos[id] = dataUri; // sempre atualiza — não só fotos ausentes
@@ -1526,7 +1550,6 @@
                 }
                 if (total > 0) {
                     localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-                    _datLidoNestaSessao = true; // libera gravarFotosNoDat para esta sessão
                 }
                 return total;
             } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
@@ -1571,11 +1594,19 @@
                         paginaAtual = 1;
                         atualizarTudo();
                         atualizarBannerSync("ok");
-                        toast(`${importados.length} livro(s) e ${totalFotos} foto(s) carregado(s).`, 4000);
+                        const totalLocal = Object.keys(fotos).length;
+                        const msgFotos = totalFotos > 0
+                            ? `${totalFotos} foto(s) importada(s) do .dat.`
+                            : `Dat vazio — ${totalLocal} foto(s) existente(s) serao gravadas nele.`;
+                        toast(`${importados.length} livro(s) · ${msgFotos}`, 4500);
                         return;
                     } catch(e) {}
                 }
-                toast(`Fotos vinculadas: ${totalFotos} foto(s).`, 3500);
+                const totalLocal = Object.keys(fotos).length;
+                const msgFotos = totalFotos > 0
+                    ? `${totalFotos} foto(s) do .dat.`
+                    : `Dat vazio — ${totalLocal} foto(s) existente(s) serao gravadas nele.`;
+                toast(`Fotos vinculadas. ${msgFotos}`, 3500);
             } catch (e) { if (e.name !== "AbortError") toast("Erro ao vincular arquivo de fotos.", 3000); }
         }
 
@@ -1593,6 +1624,75 @@
             }
         }
 
+        function fotosOrfas() {
+            const ids = new Set(biblioteca.map(l => l.id).filter(Boolean));
+            return Object.entries(fotos).filter(([id]) => !ids.has(id));
+        }
+
+        function atualizarBotaoFotosOrfas() {
+            const btn = document.getElementById("btn-fotos-orfas");
+            if (!btn) return;
+            const orfas = fotosOrfas();
+            if (orfas.length > 0) {
+                btn.textContent = "Fotos orfas (" + orfas.length + ")";
+                btn.style.display = "";
+            } else {
+                btn.style.display = "none";
+            }
+        }
+
+        function mostrarFotosOrfas() {
+            const orfas = fotosOrfas();
+            const lista = document.getElementById("fotos-orfas-lista");
+            if (orfas.length === 0) {
+                lista.innerHTML = '<p style="color:#6b7280;font-size:13px;text-align:center;padding:20px 0;">Nenhuma foto orfa encontrada.</p>';
+            } else {
+                lista.innerHTML = orfas.map(([id, dataUri]) =>
+                    `<div data-orfa-id="${id}" style="display:flex;align-items:center;gap:12px;padding:8px;background:#f9fafb;border-radius:8px;">` +
+                    `<img src="${dataUri}" style="width:56px;height:72px;object-fit:cover;border-radius:4px;flex-shrink:0;border:1px solid #e5e7eb;">` +
+                    `<div style="flex:1;min-width:0;"><div style="font-size:11px;font-family:monospace;color:#6b7280;word-break:break-all;">${id}</div></div>` +
+                    `<div class="acoes-orfa" style="display:flex;gap:4px;flex-shrink:0;">` +
+                    `<button type="button" class="btn-ghost" style="font-size:12px;color:#166b48;" data-associar-orfa="${id}">Associar</button>` +
+                    `<button type="button" class="btn-ghost" style="font-size:12px;color:#dc2626;" data-excluir-orfa="${id}">Excluir</button>` +
+                    `</div>` +
+                    `</div>`
+                ).join("");
+            }
+            document.getElementById("modal-fotos-orfas").style.display = "flex";
+        }
+
+        function associarFotoOrfa(orphanId) {
+            const item = document.querySelector(`[data-orfa-id="${orphanId}"]`);
+            if (!item) return;
+            const acoes = item.querySelector(".acoes-orfa");
+            const livrosOrdenados = [...biblioteca].sort((a, b) => (a.titulo || "").localeCompare(b.titulo || "", "pt"));
+            acoes.innerHTML =
+                `<select id="sel-assoc-${orphanId}" style="font-size:12px;padding:3px;border:1px solid #d1d5db;border-radius:4px;max-width:180px;">` +
+                `<option value="">— livro —</option>` +
+                livrosOrdenados.map(l => `<option value="${l.id}">${escapeHtml(l.titulo)}</option>`).join("") +
+                `</select>` +
+                `<button type="button" class="btn-ghost" style="font-size:12px;color:#166b48;" data-confirmar-assoc="${orphanId}">OK</button>` +
+                `<button type="button" class="btn-ghost" style="font-size:12px;" data-cancelar-assoc="${orphanId}">&#10005;</button>`;
+        }
+
+        function excluirFotoOrfa(id) {
+            delete fotos[id];
+            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+            gravarFotosNoDat();
+            mostrarFotosOrfas();
+            atualizarBotaoFotosOrfas();
+        }
+
+        function excluirTodasFotosOrfas() {
+            const orfas = fotosOrfas();
+            orfas.forEach(([id]) => delete fotos[id]);
+            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+            gravarFotosNoDat();
+            document.getElementById("modal-fotos-orfas").style.display = "none";
+            atualizarBotaoFotosOrfas();
+            toast(orfas.length + " foto(s) orfa(s) excluida(s).", 3000);
+        }
+
         // === File System Access API ===
         async function verificarPermissaoEscrita(handle, solicitar = false) {
             if (!handle || !handle.queryPermission) return false;
@@ -1606,6 +1706,9 @@
                     toast("O navegador vai pedir permissao para EDITAR o arquivo — clique em \"Save changes\" (Permitir). Isso nao apaga nada.", 6000);
                     const rp = await Promise.race([handle.requestPermission(opts), prazo(15000)]);
                     if (rp === "granted") return true;
+                    // Chrome às vezes retorna "prompt" mesmo após o usuário clicar em Permitir — re-verifica
+                    const recheck = await handle.queryPermission(opts);
+                    return recheck === "granted";
                 }
             } catch {}
             return false;
@@ -1813,8 +1916,21 @@
         async function reativarPermissao() {
             if (!arquivoHandle) { vincularArquivo(); return; }
             // Pede permissão do .txt (gesto do usuário → Chrome mostra "Save changes")
-            const permTxt = await verificarPermissaoEscrita(arquivoHandle, true);
-            if (!permTxt) { toast("Permissao nao concedida."); return; }
+            let permTxt = await verificarPermissaoEscrita(arquivoHandle, true);
+            if (!permTxt) {
+                // Fallback: re-selecionar o arquivo .txt diretamente (sempre concede permissão)
+                toast("Selecione o arquivo biblioteca.txt para reautorizar.", 4000);
+                try {
+                    const opts = { types: [{ description: "Biblioteca TSV", accept: { "text/plain": [".txt"] } }], multiple: false };
+                    const [novoHandle] = await window.showOpenFilePicker(opts);
+                    arquivoHandle = novoHandle;
+                    await salvarHandleDB(novoHandle);
+                    permTxt = true;
+                } catch(e) {
+                    if (e.name !== "AbortError") console.warn("Seletor .txt cancelado:", e);
+                }
+                if (!permTxt) { toast("Permissao nao concedida."); return; }
+            }
             // Tenta restaurar permissão do .dat com requestPermission.
             // Se não funcionar (Chrome no Windows não mostra diálogo para handles salvos),
             // abre o seletor para o usuário re-selecionar o mesmo arquivo .dat.
@@ -2240,6 +2356,7 @@
             renderizarCategorias();
             renderizarSeletorEdicao();
             atualizarDataLists();
+            atualizarBotaoFotosOrfas();
         }
 
         // =====================================================================
@@ -3778,6 +3895,38 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         });
         document.getElementById("btn-recarregar").addEventListener("click", recarregarDoArquivo);
         document.getElementById("btn-dat").addEventListener("click", vincularDat);
+        document.getElementById("btn-fotos-orfas").addEventListener("click", mostrarFotosOrfas);
+        document.getElementById("btn-fechar-fotos-orfas").addEventListener("click", () => { document.getElementById("modal-fotos-orfas").style.display = "none"; });
+        document.getElementById("btn-fechar-fotos-orfas2").addEventListener("click", () => { document.getElementById("modal-fotos-orfas").style.display = "none"; });
+        document.getElementById("btn-excluir-todas-orfas").addEventListener("click", excluirTodasFotosOrfas);
+        document.getElementById("fotos-orfas-lista").addEventListener("click", (e) => {
+            const btnExcluir = e.target.closest("[data-excluir-orfa]");
+            if (btnExcluir) { excluirFotoOrfa(btnExcluir.dataset.excluirOrfa); return; }
+
+            const btnAssociar = e.target.closest("[data-associar-orfa]");
+            if (btnAssociar) { associarFotoOrfa(btnAssociar.dataset.associarOrfa); return; }
+
+            const btnConfirmar = e.target.closest("[data-confirmar-assoc]");
+            if (btnConfirmar) {
+                const orphanId = btnConfirmar.dataset.confirmarAssoc;
+                const sel = document.getElementById("sel-assoc-" + orphanId);
+                const novoId = sel ? sel.value : "";
+                if (!novoId) return;
+                if (fotos[novoId] && !confirm("Este livro ja tem uma foto. Substituir?")) return;
+                const uri = fotos[orphanId];
+                delete fotos[orphanId];
+                fotos[novoId] = uri;
+                localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                gravarFotosNoDat();
+                mostrarFotosOrfas();
+                atualizarBotaoFotosOrfas();
+                atualizarTudo();
+                return;
+            }
+
+            const btnCancelar = e.target.closest("[data-cancelar-assoc]");
+            if (btnCancelar) { mostrarFotosOrfas(); }
+        });
 
         document.querySelectorAll(".btn-add-autor, .btn-add-tema").forEach(btn => {
             btn.addEventListener("click", () => {
