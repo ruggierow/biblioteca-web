@@ -1261,6 +1261,28 @@
             }
         }
 
+        /// Avisa a camada nativa que estas capas foram apagadas, para que a
+        /// exclusão seja registrada e não volte atrás na sincronização de outro
+        /// aparelho. Ver comum/exclusao-de-fotos.md.
+        ///
+        /// Os ids vão EXPLÍCITOS: deduzir por diferença entre o que se grava e o
+        /// que havia no arquivo seria perigoso — uma memória incompleta (cota
+        /// estourada, leitura falha) pareceria uma exclusão em massa.
+        function registrarRemocaoDeFotos(ids) {
+            if (!ids || ids.length === 0) return;
+            if (window.__TAURI__) {
+                window.__TAURI__.core.invoke("registrar_remocoes", { ids })
+                    .catch(e => console.warn("registrar_remocoes:", e));
+                return;
+            }
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.fotosRemovidas.postMessage(JSON.stringify(ids)); }
+                catch (e) { console.warn("fotosRemovidas:", e); }
+            }
+            // Modo navegador: sem camada nativa, não há onde registrar. O .dat
+            // ainda perde a foto; o que não acontece é a exclusão se propagar.
+        }
+
         /// Recebe o conteúdo do biblioteca.dat vindo de um app nativo, mescla com
         /// o que está em memória e marca a origem. Chamada pelo app do Mac.
         function receberFotosDoArquivo(json) {
@@ -1749,6 +1771,7 @@
 
         function excluirFotoOrfa(id) {
             delete fotos[id];
+            registrarRemocaoDeFotos([id]);
             // salvar() — e nao gravarFotosNoDat() — porque este ultimo so atende
             // o navegador com .dat vinculado; nos apps do Mac e do Windows nao ha
             // datHandle e a exclusao nunca chegava ao arquivo.
@@ -1760,6 +1783,7 @@
         function excluirTodasFotosOrfas() {
             const orfas = fotosOrfas();
             orfas.forEach(([id]) => delete fotos[id]);
+            registrarRemocaoDeFotos(orfas.map(([id]) => id));
             // salvar() — e nao gravarFotosNoDat() — porque este ultimo so atende
             // o navegador com .dat vinculado; nos apps do Mac e do Windows nao ha
             // datHandle e a exclusao nunca chegava ao arquivo.

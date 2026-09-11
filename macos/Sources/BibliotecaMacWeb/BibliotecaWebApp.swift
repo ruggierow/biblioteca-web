@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "fechar")
         config.userContentController.add(self, name: "backup")
         config.userContentController.add(self, name: "recarregar")
+        config.userContentController.add(self, name: "fotosRemovidas")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
         // executar qualquer script. O caminho aparece no banner de sincronização,
@@ -340,6 +341,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         exportarLocalStorageParaICloud()
     }
 
+    // MARK: - Registro de exclusões de capas
+    //
+    // As capas viajam pelo biblioteca.dat e cada aparelho MESCLA o que tem com o
+    // que está no arquivo — e mesclagem só sabe somar. Sem este registro, uma
+    // capa apagada aqui volta na sincronização seguinte do iPhone, que ainda a
+    // tem. Contrato em comum/exclusao-de-fotos.md.
+
+    private var pastaDeDados: URL { iCloudURL.deletingLastPathComponent() }
+    private var registroURL: URL { pastaDeDados.appendingPathComponent("biblioteca-removidas.json") }
+
+    private func registrarRemocoes(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        var reg = lerRegistro()
+        let agora = Self.carimbo.string(from: Date())
+        for id in ids { reg[id] = agora }
+        guard let dados = try? JSONSerialization.data(
+            withJSONObject: reg, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: pastaDeDados, withIntermediateDirectories: true)
+        do {
+            try dados.write(to: registroURL, options: .atomic)
+        } catch {
+            print("registro de exclusões: falha ao gravar:", error)
+        }
+    }
+
+    private func lerRegistro() -> [String: String] {
+        guard let dados = try? Data(contentsOf: registroURL),
+              let reg = try? JSONSerialization.jsonObject(with: dados) as? [String: String]
+        else { return [:] }
+        // Entradas com mais de 90 dias saem: passado esse prazo, qualquer
+        // aparelho que ainda tivesse a capa já teria sincronizado.
+        let limite = Date().addingTimeInterval(-90 * 86_400)
+        return reg.filter { (Self.carimbo.date(from: $0.value) ?? .distantPast) > limite }
+    }
+
+    private static let carimbo: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
     // MARK: - Backup automático
     //
     // Copia o arquivo ANTES da primeira gravação da sessão, preservando o último
@@ -490,6 +532,12 @@ extension AppDelegate: WKScriptMessageHandler {
         case "backup":
             guard let sufixo = message.body as? String else { return }
             fazerBackup(sufixo)
+        case "fotosRemovidas":
+            guard let json = message.body as? String,
+                  let dados = json.data(using: .utf8),
+                  let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
+            else { return }
+            registrarRemocoes(ids)
         case "recarregar":
             // Equivalente ao ⌘R do menu, acionável pelo botão da própria página —
             // assim o Mac e o Windows têm o mesmo controle no mesmo lugar.

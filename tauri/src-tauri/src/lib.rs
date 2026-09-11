@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -257,6 +258,88 @@ fn backup_automatico(arquivo: &Path, maximo: usize, feito: &AtomicBool) {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// Registro de exclusoes de fotos
+//
+// As capas viajam pelo biblioteca.dat e cada lado MESCLA o que tem com o que
+// esta no arquivo — e mesclagem so sabe somar. Sem este registro, uma foto
+// apagada aqui volta na proxima sincronizacao do iPhone, que ainda a tem.
+//
+// Formato (arquivo separado, para nao quebrar versoes antigas):
+//   biblioteca-removidas.json  =  { "<fotoId>": "<ISO8601>" }
+//
+// Contrato completo em comum/exclusao-de-fotos.md
+// ---------------------------------------------------------------------------
+
+fn caminho_removidas() -> PathBuf {
+    caminho_dat().with_file_name("biblioteca-removidas.json")
+}
+
+/// Le o registro. Mapa de fotoId -> carimbo.
+fn ler_removidas() -> BTreeMap<String, String> {
+    let caminho = caminho_removidas();
+    if !caminho.exists() {
+        return BTreeMap::new();
+    }
+    fs::read_to_string(&caminho)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+/// Devolve o registro ao frontend, para ele filtrar o que exibe.
+#[tauri::command]
+fn carregar_removidas() -> String {
+    serde_json::to_string(&ler_removidas()).unwrap_or_else(|_| "{}".into())
+}
+
+/// Registra exclusoes. O frontend informa os ids EXPLICITAMENTE — nao deduzimos
+/// por diferenca, porque uma memoria incompleta pareceria exclusao em massa.
+#[tauri::command]
+fn registrar_remocoes(ids: Vec<String>) -> Result<usize, String> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let mut reg = ler_removidas();
+    let agora = carimbo_iso();
+    for id in ids {
+        reg.insert(id, agora.clone());
+    }
+    let caminho = caminho_removidas();
+    if let Some(pai) = caminho.parent() {
+        fs::create_dir_all(pai).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(&reg).map_err(|e| e.to_string())?;
+    fs::write(&caminho, json).map_err(|e| e.to_string())?;
+    Ok(reg.len())
+}
+
+/// Carimbo ISO8601 em UTC, sem dependencia nova: derivado do epoch.
+fn carimbo_iso() -> String {
+    let seg = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0) as i64;
+    let dias = seg / 86_400;
+    let resto = seg % 86_400;
+    // Algoritmo civil-from-days (Howard Hinnant) — data a partir do dia do epoch.
+    let z = dias + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        y, m, d, resto / 3600, (resto % 3600) / 60, resto % 60
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Comandos expostos ao frontend
 // ---------------------------------------------------------------------------
@@ -431,6 +514,8 @@ pub fn run() {
             listar_pastas_procuradas,
             definir_pasta,
             iniciar_sessao,
+            carregar_removidas,
+            registrar_remocoes,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");

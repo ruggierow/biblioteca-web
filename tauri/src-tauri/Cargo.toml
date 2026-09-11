@@ -19,6 +19,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 dirs = "5"
+# registro de exclusoes de fotos (comum/exclusao-de-fotos.md)
+serde_json = "1"
 # pinado — não fazer upgrade sem verificar tauri-build compatibility
 time = "=0.3.51"
 
