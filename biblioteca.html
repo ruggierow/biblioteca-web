@@ -1204,7 +1204,78 @@
         let _datLidoNestaSessao = false; // só grava no .dat se ele foi lido com sucesso
 
         const FOTOS_KEY = "biblioteca-fotos";
+        // A leitura inicial continua existindo para MIGRAR quem ainda tem fotos
+        // guardadas só no navegador. A partir daqui, quem manda é o biblioteca.dat.
         let fotos = (() => { try { return JSON.parse(localStorage.getItem(FOTOS_KEY)) || {}; } catch { return {}; } })();
+
+        // Verdadeiro assim que as fotos forem lidas de um arquivo nesta sessão.
+        // Só então é seguro descartar a cópia do localStorage.
+        let _fotosVieramDoArquivo = false;
+        let _avisouCotaFotos = false;
+
+        /// Carimbo de data/hora local no formato AAAA-MM-DD_HHhMM — o mesmo que
+        /// nomeia os backups, e que ordena igual cronologicamente.
+        function carimboAgora(d = new Date()) {
+            const p = n => String(n).padStart(2, "0");
+            return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate())
+                 + "_" + p(d.getHours()) + "h" + p(d.getMinutes());
+        }
+
+        /// Existe um biblioteca.dat servindo de fonte das fotos?
+        /// Nos apps nativos, sempre. No navegador, depois de vincular o .dat.
+        function temArquivoDeFotos() {
+            return !!(window.__TAURI__ || window.__BIBLIOTECA_NATIVE__ || datHandle);
+        }
+
+        /// Guarda as fotos no localStorage — mas SÓ quando não há arquivo .dat.
+        ///
+        /// As fotos são data URIs e a coleção passa fácil dos ~5 MB que o
+        /// navegador reserva por origem (a base atual já tem 9 MB). O que
+        /// acontecia antes: o setItem estourava a cota e o erro era engolido por
+        /// um catch vazio. No Windows as fotos simplesmente não persistiam; no
+        /// Mac, onde o limite é mais folgado, ficavam DUPLICADAS — 9,2 MB no
+        /// localStorage repetindo o que já estava no .dat.
+        ///
+        /// Havendo .dat, ele é a fonte, e duplicar só gasta cota.
+        function persistirFotosLocal() {
+            if (temArquivoDeFotos()) {
+                // As fotos vieram do arquivo, logo o arquivo as tem. A cópia do
+                // localStorage é resto de versão antiga e pode sair, liberando a
+                // cota para os livros.
+                if (_fotosVieramDoArquivo && localStorage.getItem(FOTOS_KEY) !== null) {
+                    try { localStorage.removeItem(FOTOS_KEY); } catch (_) {}
+                }
+                return;
+            }
+            try {
+                persistirFotosLocal();
+            } catch (e) {
+                // Sem arquivo vinculado e sem espaço: as fotos só existem em
+                // memória e se perdem ao fechar. O usuário precisa saber disso.
+                if (!_avisouCotaFotos) {
+                    _avisouCotaFotos = true;
+                    toast("As fotos não cabem mais no armazenamento do navegador. " +
+                          "Use “Vincular fotos (.dat)” para guardá-las num arquivo.", 8000);
+                }
+                console.warn("localStorage sem espaço para as fotos:", e && e.name);
+            }
+        }
+
+        /// Recebe o conteúdo do biblioteca.dat vindo de um app nativo, mescla com
+        /// o que está em memória e marca a origem. Chamada pelo app do Mac.
+        function receberFotosDoArquivo(json) {
+            try {
+                const novas = typeof json === "string" ? JSON.parse(json) : json;
+                fotos = Object.assign({}, fotos, novas);
+                _fotosVieramDoArquivo = true;
+                persistirFotosLocal();
+                if (typeof atualizarTudo === "function") atualizarTudo();
+                return Object.keys(fotos).length;
+            } catch (e) {
+                console.error("Erro ao receber fotos do arquivo:", e);
+                return -1;
+            }
+        }
         let _fotoPendenteCadastro = null;
         let _fotoPendenteEdicao = null;
         let _fotoRemovidaEdicao = false;
@@ -1549,7 +1620,9 @@
                     total++;
                 }
                 if (total > 0) {
-                    localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+                    // O arquivo tem as fotos: a cópia do localStorage vira resto
+                    _fotosVieramDoArquivo = true;
+                    persistirFotosLocal();
                 }
                 return total;
             } catch (e) { console.error("Erro ao ler fotos do dat:", e); return 0; }
@@ -1559,7 +1632,6 @@
         async function gravarFotosNoDat() {
             if (!datHandle || !SUPORTA_FSA) return;
             if (!_datLidoNestaSessao) return; // nunca sobrescreve sem ter lido o .dat antes
-            if (Object.keys(fotos).length === 0) return;
             try {
                 const perm = await datHandle.queryPermission({ mode: "readwrite" });
                 if (perm !== "granted") {
@@ -1677,8 +1749,10 @@
 
         function excluirFotoOrfa(id) {
             delete fotos[id];
-            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-            gravarFotosNoDat();
+            // salvar() — e nao gravarFotosNoDat() — porque este ultimo so atende
+            // o navegador com .dat vinculado; nos apps do Mac e do Windows nao ha
+            // datHandle e a exclusao nunca chegava ao arquivo.
+            salvar();
             mostrarFotosOrfas();
             atualizarBotaoFotosOrfas();
         }
@@ -1686,8 +1760,10 @@
         function excluirTodasFotosOrfas() {
             const orfas = fotosOrfas();
             orfas.forEach(([id]) => delete fotos[id]);
-            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-            gravarFotosNoDat();
+            // salvar() — e nao gravarFotosNoDat() — porque este ultimo so atende
+            // o navegador com .dat vinculado; nos apps do Mac e do Windows nao ha
+            // datHandle e a exclusao nunca chegava ao arquivo.
+            salvar();
             document.getElementById("modal-fotos-orfas").style.display = "none";
             atualizarBotaoFotosOrfas();
             toast(orfas.length + " foto(s) orfa(s) excluida(s).", 3000);
@@ -1741,15 +1817,24 @@
         }
 
         function atualizarBannerSync(estado) {
-            // Modo nativo macOS: banner fixo mostrando sincronização com iCloud
+            // Modo nativo macOS: banner fixo com o caminho real do arquivo
             if (window.__BIBLIOTECA_NATIVE__) {
                 const banner = document.getElementById("sync-banner");
                 const msg = document.getElementById("sync-mensagem");
                 if (banner) { banner.className = "sync-banner sync-ok"; }
-                if (msg) { msg.textContent = "Sincronizado com iCloud Drive — alterações salvas automaticamente."; }
-                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                if (msg) {
+                    const caminho = window.__BIBLIOTECA_CAMINHO__;
+                    msg.textContent = caminho
+                        ? `Arquivo: ${caminho} — alterações salvas automaticamente.`
+                        : "Sincronizado com iCloud Drive — alterações salvas automaticamente.";
+                }
+                // Vincular/Desvincular não fazem sentido aqui (o caminho é fixo),
+                // mas Recarregar sim: o arquivo pode ter mudado no iPhone ou no PC.
+                ["btn-vincular","btn-desvincular"].forEach(id => {
                     const b = document.getElementById(id); if (b) b.style.display = "none";
                 });
+                const btnR = document.getElementById("btn-recarregar");
+                if (btnR) btnR.style.display = "";
                 return;
             }
 
@@ -1765,9 +1850,11 @@
                         if (msg) msg.textContent = "Sincronizado — alterações salvas automaticamente.";
                     });
                 }
-                ["btn-vincular","btn-desvincular","btn-recarregar"].forEach(id => {
+                ["btn-vincular","btn-desvincular"].forEach(id => {
                     const b = document.getElementById(id); if (b) b.style.display = "none";
                 });
+                const btnR = document.getElementById("btn-recarregar");
+                if (btnR) btnR.style.display = "";
                 return;
             }
 
@@ -1980,7 +2067,64 @@
             toast("Arquivo desvinculado.");
         }
 
+        /// Relê TSV e fotos pelo Rust (Windows). Usada na abertura e no botão
+        /// Recarregar — as duas precisam do mesmo comportamento.
+        async function carregarDoTauri({ mostrarDiagnostico = false } = {}) {
+            const inv = window.__TAURI__.core.invoke;
+            if (mostrarDiagnostico) {
+                try {
+                    const diag = await inv("diagnosticar");
+                    console.info("[Tauri] " + diag);
+                    toast(diag, 6000);
+                } catch (_) {}
+            }
+            const tsv = await inv("carregar_tsv");
+            if (tsv) {
+                biblioteca = parseTSV(tsv);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+                paginaAtual = 1;
+            }
+            const fotosJson = await inv("carregar_fotos");
+            if (fotosJson) {
+                try {
+                    const fotosArquivo = JSON.parse(fotosJson);
+                    fotos = Object.assign({}, fotos, fotosArquivo);
+                    _fotosVieramDoArquivo = true;
+                    persistirFotosLocal();
+                } catch (e) {
+                    // Antes este catch era vazio e escondia inclusive JSON quebrado.
+                    console.error("Erro ao ler as fotos do arquivo:", e);
+                    toast("As fotos não puderam ser lidas do arquivo.", 5000);
+                }
+            }
+            atualizarTudo();
+            atualizarBannerSync("ok");
+            return { livros: biblioteca.length, fotos: Object.keys(fotos).length };
+        }
+
         async function recarregarDoArquivo() {
+            // App macOS: o Swift relê o iCloud e reinjeta os dados na página.
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    window.webkit.messageHandlers.recarregar.postMessage("");
+                    toast("Recarregando do iCloud…");
+                } catch (_) {
+                    toast("Erro ao recarregar.");
+                }
+                return;
+            }
+
+            // App Windows (Tauri): relê o arquivo do disco pelo Rust.
+            if (window.__TAURI__) {
+                try {
+                    const r = await carregarDoTauri();
+                    toast(`${r.livros} livro(s) e ${r.fotos} foto(s) recarregado(s).`);
+                } catch (e) {
+                    toast("Erro ao recarregar: " + e, 5000);
+                }
+                return;
+            }
+
             if (!arquivoHandle) {
                 toast("Nenhum arquivo vinculado para recarregar.");
                 return;
@@ -2003,9 +2147,28 @@
             }
         }
 
+        // Espera antes de gravar no Windows: 500 ms para o texto e 1 s para as
+        // fotos, iguais aos do app do Mac. A gravação das fotos pode ser RECUSADA
+        // pelo Rust se o .dat ainda não tiver sido lido nesta sessão — nesse caso
+        // avisamos, em vez de falhar em silêncio e o usuário achar que salvou.
+        let _tauriTimerTsv = null, _tauriTimerFotos = null;
+        function agendarGravacaoTauri() {
+            const inv = window.__TAURI__.core.invoke;
+            clearTimeout(_tauriTimerTsv);
+            _tauriTimerTsv = setTimeout(() => {
+                inv("salvar_tsv", { conteudo: serializarTSV() })
+                    .catch(e => toast("Erro ao gravar biblioteca.txt: " + e, 5000));
+            }, 500);
+            clearTimeout(_tauriTimerFotos);
+            _tauriTimerFotos = setTimeout(() => {
+                inv("salvar_fotos", { conteudo: JSON.stringify(fotos) })
+                    .catch(e => toast("Fotos não gravadas — " + e, 6000));
+            }, 1000);
+        }
+
         function salvar() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
-            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
+            persistirFotosLocal();
             if (arquivoHandle) {
                 salvarNoArquivo();
             }
@@ -2014,10 +2177,11 @@
                 try { window.webkit.messageHandlers.exportar.postMessage(serializarTSV()); } catch(_) {}
                 try { window.webkit.messageHandlers.fotos.postMessage(JSON.stringify(fotos)); } catch(_) {}
             }
-            // Modo Tauri (Windows): grava TSV e fotos diretamente em Documents via Rust
+            // App Windows (Tauri): grava TSV e fotos via Rust, com espera — o mesmo
+            // intervalo do app do Mac, para não reescrever o arquivo do iCloud a
+            // cada tecla digitada.
             if (window.__TAURI__) {
-                try { window.__TAURI__.core.invoke("salvar_tsv", { conteudo: serializarTSV() }); } catch(_) {}
-                try { window.__TAURI__.core.invoke("salvar_fotos", { conteudo: JSON.stringify(fotos) }); } catch(_) {}
+                agendarGravacaoTauri();
             }
             // Modo Chrome com dat vinculado: grava fotos no arquivo .dat (OneDrive)
             gravarFotosNoDat();
@@ -3782,6 +3946,15 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 } catch (e) {
                     toast("Erro no backup: " + e);
                 }
+            } else if (window.__BIBLIOTECA_NATIVE__) {
+                // App macOS: o Swift copia ao lado do biblioteca.txt no iCloud, igual
+                // ao que o Windows faz. Antes isto caía no último recurso e baixava
+                // o backup para a pasta Downloads — comportamento diferente do PC.
+                try {
+                    window.webkit.messageHandlers.backup.postMessage(sufixo);
+                } catch (e) {
+                    toast("Erro no backup.");
+                }
             } else if ('showSaveFilePicker' in window) {
                 // Browser com File System Access API: abre diálogo já na pasta do arquivo vinculado
                 const opts = {
@@ -3916,8 +4089,10 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 const uri = fotos[orphanId];
                 delete fotos[orphanId];
                 fotos[novoId] = uri;
-                localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-                gravarFotosNoDat();
+                // salvar() — e nao gravarFotosNoDat() — porque este ultimo so
+                // atende o navegador com .dat vinculado; nos apps do Mac e do
+                // Windows nao ha datHandle e a exclusao nunca chegava ao arquivo.
+                salvar();
                 mostrarFotosOrfas();
                 atualizarBotaoFotosOrfas();
                 atualizarTudo();
@@ -3957,32 +4132,18 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         (async () => {
             if (window.__BIBLIOTECA_NATIVE__) return; // dados injetados pelo Swift via WKWebView
 
-            // Modo Tauri (Windows): carrega TSV e fotos diretamente do arquivo em Documents
+            // App Windows (Tauri): carrega TSV e fotos do arquivo encontrado pelo Rust
             if (window.__TAURI__) {
                 try {
-                    // Diagnóstico: mostra onde o app encontrou (ou não) os arquivos
-                    const diag = await window.__TAURI__.core.invoke("diagnosticar");
-                    console.info("[Tauri] " + diag);
-                    toast(diag, 6000);
+                    // O Rust não tem hora local de graça; mandamos o carimbo daqui.
+                    // Ele nomeia o backup automático, que guarda o estado em que
+                    // esta sessão começou — por isso a hora é a de agora.
+                    try {
+                        await window.__TAURI__.core.invoke("iniciar_sessao", { sufixo: carimboAgora() });
+                    } catch (_) {}
 
-                    const tsv = await window.__TAURI__.core.invoke("carregar_tsv");
-                    if (tsv) {
-                        const importados = parseTSV(tsv);
-                        biblioteca = importados;
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
-                        paginaAtual = 1;
-                    }
-                    const fotosJson = await window.__TAURI__.core.invoke("carregar_fotos");
-                    if (fotosJson) {
-                        try {
-                            const fotosArquivo = JSON.parse(fotosJson);
-                            fotos = Object.assign({}, fotos, fotosArquivo);
-                            localStorage.setItem(FOTOS_KEY, JSON.stringify(fotos));
-                        } catch(_) {}
-                    }
-                    atualizarTudo();
-                    atualizarBannerSync("ok");
-                    setTimeout(() => toast(`${biblioteca.length} livro(s) e ${Object.keys(fotos).length} foto(s) carregado(s).`, 4000), 6500);
+                    const r = await carregarDoTauri({ mostrarDiagnostico: true });
+                    setTimeout(() => toast(`${r.livros} livro(s) e ${r.fotos} foto(s) carregado(s).`, 4000), 6500);
                 } catch(e) {
                     console.error("Tauri load error:", e);
                     toast("Erro Tauri: " + e, 6000);

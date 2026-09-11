@@ -1,4 +1,4 @@
-name: BibliotecaWeb
+name: Biblioteca-Mac
 options:
   bundleIdPrefix: com.ruggierow
   deploymentTarget:

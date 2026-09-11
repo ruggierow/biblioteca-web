@@ -11,3 +11,16 @@ build/
 
 # Arquivos de dados de desenvolvimento (não commitar a base real)
 biblioteca.txt
+
+# Encenacao do empacotamento — bin/empacotar.sh copia estes para ca na hora de
+# gerar os pacotes. O motor e UM so: motor-web/biblioteca.html.
+windows/biblioteca.html
+windows/Manual.html
+windows/Manual.pdf
+windows/*-setup.exe
+
+# Rust / Tauri
+tauri/src-tauri/target/
+
+# Pacotes prontos
+dist/
