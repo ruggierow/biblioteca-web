@@ -1,6 +1,6 @@
 [package]
 name = "biblioteca-tauri-lib"
-version = "1.9.0"
+version = "1.9.1"
 edition = "2021"
 description = "Biblioteca — motor Windows (Tauri)"
 authors = ["Ruggierow"]
