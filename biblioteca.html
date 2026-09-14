@@ -2564,11 +2564,31 @@
             if (!grupos.find(g => g.id === 1)) {
                 grupos.unshift({ id: 1, nome: "Grupo de Literatura" });
                 salvarGrupos();
+            } else {
+                publicarGrupos(); // garante o arquivo mesmo sem ninguem editar nada
             }
         }
 
         function salvarGrupos() {
             localStorage.setItem(GRUPOS_KEY, JSON.stringify(grupos));
+            publicarGrupos();
+        }
+
+        /// Os nomes dos grupos vivem no localStorage, que nao sai do navegador:
+        /// o biblioteca.txt guarda so os numeros ("1;3"). Sem isto, o iPhone
+        /// mostra "Grupo 2" onde aqui se le "Clube da Tarde", e o Windows nem
+        /// sequer ve os nomes que voce deu no Mac.
+        ///
+        /// O app do Mac grava um grupos.json ao lado do arquivo, de onde quem
+        /// vincula a PASTA (o proprio Mac e o iPhone) le sozinho. No navegador
+        /// puro nao ha onde gravar — so temos permissao sobre os arquivos
+        /// escolhidos um a um, nunca sobre a pasta.
+        function publicarGrupos() {
+            if (!window.__BIBLIOTECA_NATIVE__) return;
+            try {
+                window.webkit.messageHandlers.grupos.postMessage(
+                    JSON.stringify({ versao: 1, grupos }));
+            } catch (e) { console.warn("grupos:", e); }
         }
 
         function proximoIdGrupo() {

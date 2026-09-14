@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "backup")
         config.userContentController.add(self, name: "recarregar")
         config.userContentController.add(self, name: "fotosRemovidas")
+        config.userContentController.add(self, name: "grupos")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
         // executar qualquer script. O caminho aparece no banner de sincronização,
@@ -366,6 +367,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Nomes dos grupos de literatura
+    //
+    // O biblioteca.txt guarda so os NUMEROS dos grupos na coluna 8 ("1;3"); os
+    // nomes ficam no localStorage do navegador, que nao sai daqui. Sem este
+    // arquivo, o iPhone mostra "Grupo 2" onde aqui se le "Clube da Tarde", e o
+    // Windows nem ve os nomes dados no Mac.
+
+    private var gruposURL: URL { pastaDeDados.appendingPathComponent("grupos.json") }
+
+    private func gravarGrupos(_ json: String) {
+        guard let dados = json.data(using: .utf8),
+              (try? JSONSerialization.jsonObject(with: dados)) != nil
+        else { return }
+        // O HTML publica a cada abertura; nao vale sujar o iCloud sem mudanca.
+        if let atual = try? Data(contentsOf: gruposURL), atual == dados { return }
+        try? FileManager.default.createDirectory(at: pastaDeDados, withIntermediateDirectories: true)
+        do {
+            try dados.write(to: gruposURL, options: .atomic)
+        } catch {
+            print("grupos: falha ao gravar:", error)
+        }
+    }
+
     private func lerRegistro() -> [String: String] {
         guard let dados = try? Data(contentsOf: registroURL),
               let reg = try? JSONSerialization.jsonObject(with: dados) as? [String: String]
@@ -538,6 +562,9 @@ extension AppDelegate: WKScriptMessageHandler {
                   let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
             else { return }
             registrarRemocoes(ids)
+        case "grupos":
+            guard let json = message.body as? String else { return }
+            gravarGrupos(json)
         case "recarregar":
             // Equivalente ao ⌘R do menu, acionável pelo botão da própria página —
             // assim o Mac e o Windows têm o mesmo controle no mesmo lugar.
