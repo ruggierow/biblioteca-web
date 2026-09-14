@@ -7,47 +7,50 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2150707204083352E6B0E7C9 /* biblioteca.html in Resources */ = {isa = PBXBuildFile; fileRef = 13EE1D88BB16156370DBC9FE /* biblioteca.html */; };
-		233D1DA7DEFE320BB24B15DC /* BibliotecaWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6636DDAFC8DB64AA66BB8B94 /* BibliotecaWebApp.swift */; };
+		0C5EA7E4189B10DA40D369C6 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 13888876EF082DF0B6BDFF0E /* AppIcon.icns */; };
+		0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */; };
+		F1E95BECFEF287E4DEDF55B0 /* biblioteca.html in Resources */ = {isa = PBXBuildFile; fileRef = 57400D1513BF567EE710732A /* biblioteca.html */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		13EE1D88BB16156370DBC9FE /* biblioteca.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = biblioteca.html; sourceTree = "<group>"; };
-		4A924B729BF8F71F830E3823 /* BibliotecaWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibliotecaWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6636DDAFC8DB64AA66BB8B94 /* BibliotecaWebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibliotecaWebApp.swift; sourceTree = "<group>"; };
+		13888876EF082DF0B6BDFF0E /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		45514A6994E13C15FF7F90F4 /* BibliotecaWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibliotecaWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		57400D1513BF567EE710732A /* biblioteca.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = biblioteca.html; sourceTree = "<group>"; };
+		97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibliotecaWebApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		003C0912833D765F77569D29 /* Products */ = {
+		0332907EF60E3B4C79D06430 = {
 			isa = PBXGroup;
 			children = (
-				4A924B729BF8F71F830E3823 /* BibliotecaWeb.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		4990FFF53DF318260EBF16E2 = {
-			isa = PBXGroup;
-			children = (
-				50CCF08D94DE88F19EBD673E /* BibliotecaMacWeb */,
-				8512463C18AEC2133E4C7D2D /* Resources */,
-				003C0912833D765F77569D29 /* Products */,
+				7C398C83BC19289DEF169877 /* BibliotecaMacWeb */,
+				B9069422FE0C8D4E5DFAE16F /* Resources */,
+				B08A57CC01784BEBDAE5E38D /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		50CCF08D94DE88F19EBD673E /* BibliotecaMacWeb */ = {
+		7C398C83BC19289DEF169877 /* BibliotecaMacWeb */ = {
 			isa = PBXGroup;
 			children = (
-				6636DDAFC8DB64AA66BB8B94 /* BibliotecaWebApp.swift */,
+				97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */,
 			);
 			name = BibliotecaMacWeb;
 			path = Sources/BibliotecaMacWeb;
 			sourceTree = "<group>";
 		};
-		8512463C18AEC2133E4C7D2D /* Resources */ = {
+		B08A57CC01784BEBDAE5E38D /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				13EE1D88BB16156370DBC9FE /* biblioteca.html */,
+				45514A6994E13C15FF7F90F4 /* BibliotecaWeb.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B9069422FE0C8D4E5DFAE16F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				13888876EF082DF0B6BDFF0E /* AppIcon.icns */,
+				57400D1513BF567EE710732A /* biblioteca.html */,
 			);
 			name = Resources;
 			path = Sources/BibliotecaMacWeb/Resources;
@@ -56,12 +59,12 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1DD03C0829102686FAA267E3 /* BibliotecaWeb */ = {
+		5C0B7C2897FE594CB605A095 /* BibliotecaWeb */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D57B7E20BDD2B787E66996ED /* Build configuration list for PBXNativeTarget "BibliotecaWeb" */;
+			buildConfigurationList = 36A4FB96397831AB55A950B5 /* Build configuration list for PBXNativeTarget "BibliotecaWeb" */;
 			buildPhases = (
-				CADBFC18E63F3D86546317A9 /* Sources */,
-				3C7EE1F92E7BC97F1A2C3325 /* Resources */,
+				4C480966887BB8FCD8768705 /* Sources */,
+				23CE3CB341253ED261CA87C7 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -71,109 +74,125 @@
 			packageProductDependencies = (
 			);
 			productName = BibliotecaWeb;
-			productReference = 4A924B729BF8F71F830E3823 /* BibliotecaWeb.app */;
+			productReference = 45514A6994E13C15FF7F90F4 /* BibliotecaWeb.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		17B3B8C1B5B5CCC465D3FA4F /* Project object */ = {
+		424B855E95D6DFF199C4C149 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
-					1DD03C0829102686FAA267E3 = {
+					5C0B7C2897FE594CB605A095 = {
 						DevelopmentTeam = F6WL57SVMU;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
-			buildConfigurationList = DF65DB8DBB3430F23453082C /* Build configuration list for PBXProject "BibliotecaWeb" */;
+			buildConfigurationList = 30E6F42EEF7344AAF8B0910B /* Build configuration list for PBXProject "Biblioteca-Mac" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
 				en,
 			);
-			mainGroup = 4990FFF53DF318260EBF16E2;
+			mainGroup = 0332907EF60E3B4C79D06430;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 003C0912833D765F77569D29 /* Products */;
+			productRefGroup = B08A57CC01784BEBDAE5E38D /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1DD03C0829102686FAA267E3 /* BibliotecaWeb */,
+				5C0B7C2897FE594CB605A095 /* BibliotecaWeb */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		3C7EE1F92E7BC97F1A2C3325 /* Resources */ = {
+		23CE3CB341253ED261CA87C7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2150707204083352E6B0E7C9 /* biblioteca.html in Resources */,
+				0C5EA7E4189B10DA40D369C6 /* AppIcon.icns in Resources */,
+				F1E95BECFEF287E4DEDF55B0 /* biblioteca.html in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		CADBFC18E63F3D86546317A9 /* Sources */ = {
+		4C480966887BB8FCD8768705 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				233D1DA7DEFE320BB24B15DC /* BibliotecaWebApp.swift in Sources */,
+				0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		30B6E723730039C0CBE60570 /* Release */ = {
+		362910C2C04CD9B8BCB97751 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Sources/BibliotecaMacWeb/BibliotecaMacWeb.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = F6WL57SVMU;
-				INFOPLIST_FILE = Sources/BibliotecaMacWeb/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.ruggierow.biblioteca-web";
-				PRODUCT_NAME = "Biblioteca Web";
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
 			};
 			name = Release;
 		};
-		A4342872D5503E306ADDCE24 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Sources/BibliotecaMacWeb/BibliotecaMacWeb.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = F6WL57SVMU;
-				INFOPLIST_FILE = Sources/BibliotecaMacWeb/Info.plist;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.ruggierow.biblioteca-web";
-				PRODUCT_NAME = "Biblioteca Web";
-				SDKROOT = macosx;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-			};
-			name = Debug;
-		};
-		C916C33DB5F16AFD829EC15E /* Debug */ = {
+		3987FFBF1BE44C8FB7521903 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -237,85 +256,70 @@
 			};
 			name = Debug;
 		};
-		D25A830B07DD36850FC0A4D7 /* Release */ = {
+		3B092F0E1C1E31724F816148 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
-				CLANG_CXX_LIBRARY = "libc++";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				ENABLE_HARDENED_RUNTIME = YES;
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu11;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/BibliotecaMacWeb/BibliotecaMacWeb.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = F6WL57SVMU;
+				INFOPLIST_FILE = Sources/BibliotecaMacWeb/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ruggierow.biblioteca-web";
+				PRODUCT_NAME = "Biblioteca Web";
 				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.9;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		AC2182E8541EB8A5FAB64732 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/BibliotecaMacWeb/BibliotecaMacWeb.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = F6WL57SVMU;
+				INFOPLIST_FILE = Sources/BibliotecaMacWeb/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.ruggierow.biblioteca-web";
+				PRODUCT_NAME = "Biblioteca Web";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D57B7E20BDD2B787E66996ED /* Build configuration list for PBXNativeTarget "BibliotecaWeb" */ = {
+		30E6F42EEF7344AAF8B0910B /* Build configuration list for PBXProject "Biblioteca-Mac" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A4342872D5503E306ADDCE24 /* Debug */,
-				30B6E723730039C0CBE60570 /* Release */,
+				3987FFBF1BE44C8FB7521903 /* Debug */,
+				362910C2C04CD9B8BCB97751 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		DF65DB8DBB3430F23453082C /* Build configuration list for PBXProject "BibliotecaWeb" */ = {
+		36A4FB96397831AB55A950B5 /* Build configuration list for PBXNativeTarget "BibliotecaWeb" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C916C33DB5F16AFD829EC15E /* Debug */,
-				D25A830B07DD36850FC0A4D7 /* Release */,
+				3B092F0E1C1E31724F816148 /* Debug */,
+				AC2182E8541EB8A5FAB64732 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 17B3B8C1B5B5CCC465D3FA4F /* Project object */;
+	rootObject = 424B855E95D6DFF199C4C149 /* Project object */;
 }
