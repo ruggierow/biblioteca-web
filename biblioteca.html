@@ -973,7 +973,7 @@
                 Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.
             </p>
             <div class="button-row">
-                <button type="button" id="btn-vincular" class="btn-primary">Vincular biblioteca.txt</button>
+                <button type="button" id="btn-vincular" class="btn-primary">Vincular pasta</button>
                 <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos">Vincular fotos (.dat)</button>
                 <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca">Fotos orfas</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
@@ -1195,12 +1195,17 @@
         const STORE_HANDLES = "handles";
         const KEY_HANDLE = "arquivo-biblioteca";
         const KEY_DAT_HANDLE = "dat-biblioteca";
+        const KEY_PASTA_HANDLE = "pasta-biblioteca";
         let grupos = [];
         carregarGrupos();
         let biblioteca = carregar();
         let paginaAtual = 1;
         let arquivoHandle = null;
         let datHandle = null;
+        // Handle da PASTA. Quando existe, o .txt, o .dat e o grupos.json saem
+        // dele — um "vincular" so, como no Mac e no iPhone. Os handles avulsos
+        // continuam funcionando para quem vinculou antes da 1.9.1.
+        let pastaHandle = null;
         let _datLidoNestaSessao = false; // só grava no .dat se ele foi lido com sucesso
 
         const FOTOS_KEY = "biblioteca-fotos";
@@ -1597,6 +1602,27 @@
             } catch {}
         }
 
+        async function salvarPastaHandleDB(handle) {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readwrite");
+                tx.objectStore(STORE_HANDLES).put(handle, KEY_PASTA_HANDLE);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+            } catch (e) { console.warn("Falha ao salvar handle da pasta:", e); }
+        }
+
+        async function carregarPastaHandleDB() {
+            try {
+                const db = await abrirDB();
+                const tx = db.transaction(STORE_HANDLES, "readonly");
+                return await new Promise((res, rej) => {
+                    const req = tx.objectStore(STORE_HANDLES).get(KEY_PASTA_HANDLE);
+                    req.onsuccess = () => res(req.result || null);
+                    req.onerror = () => rej(req.error);
+                });
+            } catch { return null; }
+        }
+
         async function salvarDatHandleDB(handle) {
             try {
                 const db = await abrirDB();
@@ -1935,16 +1961,19 @@
             }
         }
 
-        async function vincularArquivo() {
+        /// `handlePronto` vem de vincularPasta(): o .txt ja foi resolvido dentro
+        /// da pasta escolhida e nao ha o que perguntar de novo. Toda a logica de
+        /// decidir quem vence — o arquivo ou a lista em memoria — segue a mesma.
+        async function vincularArquivo(handlePronto = null) {
             if (!SUPORTA_FSA) {
                 toast("Seu navegador nao suporta vinculacao direta.");
                 return;
             }
             try {
-                const [handle] = await window.showOpenFilePicker({
+                const handle = handlePronto || (await window.showOpenFilePicker({
                     types: [{ description: "Arquivo da biblioteca", accept: { "text/plain": [".txt"] } }],
                     multiple: false
-                });
+                }))[0];
                 if (!(await verificarPermissaoEscrita(handle, true))) {
                     toast("Permissao de escrita negada.");
                     return;
@@ -2021,6 +2050,73 @@
                 }
                 console.error(e);
                 toast("Erro ao vincular arquivo.");
+            }
+        }
+
+        /// Vincula a PASTA inteira: o biblioteca.txt, o biblioteca.dat e o
+        /// grupos.json passam a sair de uma escolha so.
+        ///
+        /// Ate a 1.9.0 o Chrome so nos dava handles de ARQUIVO, um a um — e com
+        /// eles nao ha como alcancar um vizinho. Era por isso que os nomes dos
+        /// grupos, que o Mac grava num grupos.json ao lado, nunca chegavam aqui.
+        async function vincularPasta() {
+            if (!("showDirectoryPicker" in window)) {
+                // Navegador sem seletor de pasta: segue no modelo antigo.
+                return vincularArquivo();
+            }
+            let pasta;
+            try {
+                pasta = await window.showDirectoryPicker({ mode: "readwrite" });
+            } catch (e) {
+                if (e.name === "AbortError") return;
+                console.error(e);
+                toast("Nao foi possivel abrir o seletor de pastas.");
+                return;
+            }
+
+            let txt;
+            try {
+                txt = await pasta.getFileHandle("biblioteca.txt");
+            } catch {
+                toast("Nao ha um biblioteca.txt nesta pasta. Escolha a pasta onde o arquivo esta.", 6000);
+                return;
+            }
+
+            pastaHandle = pasta;
+            await salvarPastaHandleDB(pasta);
+
+            // O .dat pode ainda nao existir: criar e legitimo, e o que o Mac faz.
+            try {
+                datHandle = await pasta.getFileHandle("biblioteca.dat", { create: true });
+                await salvarDatHandleDB(datHandle);
+                await lerFotosDoDat();
+                atualizarBotaoDat();
+            } catch (e) { console.warn("dat na pasta:", e); }
+
+            await lerGruposDaPasta();
+            await vincularArquivo(txt);
+            publicarGrupos(); // agora ha pasta: grava o grupos.json tambem no Windows
+            atualizarTudo();
+        }
+
+        /// Le os nomes dos grupos do grupos.json da pasta, se houver.
+        /// Escreve direto no localStorage para nao disparar publicarGrupos() de
+        /// volta e reescrever o arquivo que acabamos de ler.
+        async function lerGruposDaPasta() {
+            if (!pastaHandle) return;
+            try {
+                const h = await pastaHandle.getFileHandle("grupos.json");
+                const raiz = JSON.parse(await (await h.getFile()).text());
+                if (!raiz || !Array.isArray(raiz.grupos)) return;
+                const lidos = raiz.grupos.filter(
+                    g => Number.isInteger(g.id) && g.id > 0 && typeof g.nome === "string" && g.nome.trim());
+                if (lidos.length === 0) return;
+                grupos = lidos.map(g => ({ id: g.id, nome: g.nome.trim() }))
+                              .sort((a, b) => a.id - b.id);
+                localStorage.setItem(GRUPOS_KEY, JSON.stringify(grupos));
+                atualizarFiltroGrupo();
+            } catch {
+                // Sem grupos.json e o caso normal de quem nunca renomeou nada.
             }
         }
 
@@ -2584,11 +2680,25 @@
         /// puro nao ha onde gravar — so temos permissao sobre os arquivos
         /// escolhidos um a um, nunca sobre a pasta.
         function publicarGrupos() {
-            if (!window.__BIBLIOTECA_NATIVE__) return;
+            const conteudo = JSON.stringify({ versao: 1, grupos });
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    window.webkit.messageHandlers.grupos.postMessage(conteudo);
+                } catch (e) { console.warn("grupos:", e); }
+                return;
+            }
+            // Windows: so da para gravar um vizinho quando ha handle de PASTA.
+            // Com handles de arquivo avulsos nao ha permissao sobre a pasta.
+            if (pastaHandle) gravarGruposNaPasta(conteudo);
+        }
+
+        async function gravarGruposNaPasta(conteudo) {
             try {
-                window.webkit.messageHandlers.grupos.postMessage(
-                    JSON.stringify({ versao: 1, grupos }));
-            } catch (e) { console.warn("grupos:", e); }
+                const h = await pastaHandle.getFileHandle("grupos.json", { create: true });
+                const w = await h.createWritable();
+                await w.write(conteudo);
+                await w.close();
+            } catch (e) { console.warn("grupos.json:", e); }
         }
 
         function proximoIdGrupo() {
@@ -4102,7 +4212,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             if (arquivoHandle) {
                 reativarPermissao();
             } else {
-                vincularArquivo();
+                vincularPasta();
             }
         });
         document.getElementById("btn-desvincular").addEventListener("click", () => {
@@ -4200,6 +4310,22 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 atualizarBannerSync("nao-suportado");
                 return;
             }
+            // Vinculo por PASTA (1.9.1+): deriva os handles dela antes de cair
+            // no modelo antigo, de arquivos avulsos. Se a permissao da pasta
+            // ainda nao foi reconcedida nesta sessao, getFileHandle estoura e
+            // seguimos pelo handle guardado — o banner pede a reativacao como
+            // sempre fez.
+            const pastaSalva = await carregarPastaHandleDB();
+            if (pastaSalva) {
+                pastaHandle = pastaSalva;
+                try {
+                    await salvarHandleDB(await pastaSalva.getFileHandle("biblioteca.txt"));
+                    await salvarDatHandleDB(
+                        await pastaSalva.getFileHandle("biblioteca.dat", { create: true }));
+                    await lerGruposDaPasta();
+                } catch (e) { console.warn("pasta vinculada:", e); }
+            }
+
             const handleSalvo = await carregarHandleDB();
             if (_startupAborted) return;
             if (!handleSalvo) {
