@@ -1197,6 +1197,14 @@
         const KEY_DAT_HANDLE = "dat-biblioteca";
         const KEY_PASTA_HANDLE = "pasta-biblioteca";
         let grupos = [];
+        // DECLARADO ANTES de carregarGrupos(): ele chama publicarGrupos(), que
+        // le pastaHandle. Com `let` declarado depois, a zona morta temporal
+        // lanca ReferenceError e mata o script inteiro na partida — no Mac nao
+        // aparece, porque la publicarGrupos retorna antes de tocar na
+        // variavel. Quebrou so no navegador, e so foi visto abrindo o Chrome
+        // do Windows de verdade.
+        let pastaHandle = null;
+
         carregarGrupos();
         let biblioteca = carregar();
         let paginaAtual = 1;
@@ -1205,7 +1213,6 @@
         // Handle da PASTA. Quando existe, o .txt, o .dat e o grupos.json saem
         // dele — um "vincular" so, como no Mac e no iPhone. Os handles avulsos
         // continuam funcionando para quem vinculou antes da 1.9.1.
-        let pastaHandle = null;
         let _datLidoNestaSessao = false; // só grava no .dat se ele foi lido com sucesso
 
         const FOTOS_KEY = "biblioteca-fotos";
@@ -1954,7 +1961,7 @@
             } else {
                 banner.classList.add("sync-off");
                 msg.innerHTML = `Nenhum arquivo vinculado. As alteracoes ficam apenas no navegador ate voce exportar ou vincular.`;
-                btnVincular.textContent = "Vincular biblioteca.txt";
+                btnVincular.textContent = "Vincular pasta";
                 btnVincular.style.display = "";
                 btnDesvincular.style.display = "none";
                 btnRecarregar.style.display = "none";
