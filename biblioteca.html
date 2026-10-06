@@ -2417,7 +2417,7 @@
             const linhas = pagina.map(({ livro, indice }) => {
                 const comentario = (livro.comentarios || "").trim();
                 const cellComentario = comentario
-                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${escapeHtml(comentario)}</div></td>`
+                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${comLinks(comentario)}</div></td>`
                     : `<td class="cell-comentario vazio">—</td>`;
                 const local = (livro.local || "").trim();
                 const cellLocal = local
@@ -2841,6 +2841,61 @@
             return (texto || "").toString().replace(/[&<>"']/g, c => ({
                 "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
             }[c]));
+        }
+
+        // === Links nos comentarios ===================================================
+        //
+        // ORDEM IMPORTA: o texto comum e escapado peca por peca, e so os trechos
+        // reconhecidos como endereco viram <a>. Escapar o texto INTEIRO antes de
+        // procurar o endereco quebraria a URL (o "&" vira "&amp;"); procurar antes
+        // de escapar abriria a porta que o escapeHtml fecha.
+        //
+        // Quando o endereco carrega um ASIN — da Amazon (/dp/, /gp/, /product/) ou
+        // ja em kindle:// — o link aponta para o aplicativo Kindle, mas continua
+        // MOSTRANDO o endereco original. Mesma regra do app do iPhone.
+        const RE_ENDERECO = /(?:https?:\/\/|kindle:\/\/|www\.)[^\s<>"']+/gi;
+
+        function asinLimpo(valor) {
+            const f = (valor || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+            return f.length === 10 ? f : null;
+        }
+
+        function asinDoEndereco(bruto) {
+            let u;
+            try { u = new URL(bruto); } catch { return null; }
+            const porParametro = asinLimpo(u.searchParams.get("asin") || u.searchParams.get("ASIN"));
+            if (porParametro) return porParametro;
+            const partes = u.pathname.split("/").filter(Boolean);
+            for (const marca of ["dp", "gp", "product"]) {
+                const i = partes.indexOf(marca);
+                if (i >= 0 && partes[i + 1]) {
+                    const a = asinLimpo(partes[i + 1]);
+                    if (a) return a;
+                }
+            }
+            for (const parte of partes) {
+                const a = asinLimpo(parte);
+                if (a) return a;
+            }
+            return null;
+        }
+
+        function comLinks(texto) {
+            const bruto = (texto || "").toString();
+            let saida = "", fim = 0;
+            RE_ENDERECO.lastIndex = 0;
+            let m;
+            while ((m = RE_ENDERECO.exec(bruto)) !== null) {
+                saida += escapeHtml(bruto.slice(fim, m.index));
+                const achado = m[0];
+                let destino = achado.toLowerCase().startsWith("www.") ? "https://" + achado : achado;
+                const asin = asinDoEndereco(destino);
+                if (asin) destino = "kindle://book?action=open&asin=" + asin;
+                saida += `<a href="${escapeHtml(destino)}" target="_blank" rel="noopener noreferrer">${escapeHtml(achado)}</a>`;
+                fim = m.index + achado.length;
+            }
+            saida += escapeHtml(bruto.slice(fim));
+            return saida;
         }
 
         const TIPOS_CAMPO = {
@@ -3267,7 +3322,7 @@
                     <dt>Ano</dt><dd>${livro.ano}</dd>
                     <dt>Status</dt><dd>${livro.emprestado ? "Emprestado" : "Disponivel"}</dd>
                     ${(livro.local || "").trim() ? `<dt>Local</dt><dd>${escapeHtml(livro.local)}</dd>` : ""}
-                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${escapeHtml(livro.comentarios)}</dd>` : ""}
+                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios)}</dd>` : ""}
                     <dt>Grupos de Literatura</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : "Nao"}</dd>
                 </dl>
                 <script>window.onload = () => window.print();<\/script>
