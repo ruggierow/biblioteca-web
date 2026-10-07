@@ -1323,6 +1323,24 @@
             }
         }
 
+        /// No Tauri (Windows) um link nao faz nada sozinho: a janela nao abre
+        /// aba nova nem entrega o endereco ao sistema. Entao interceptamos o
+        /// clique e pedimos ao lado nativo que abra. No Mac isto NAO e preciso —
+        /// la quem entrega e o decidePolicyFor do WKWebView.
+        document.addEventListener("click", (e) => {
+            if (!window.__TAURI__) return;
+            const a = e.target.closest && e.target.closest("a[href]");
+            if (!a) return;
+            const href = a.getAttribute("href") || "";
+            if (/^(#|javascript:|blob:|data:)/i.test(href)) return;
+            e.preventDefault();
+            window.__TAURI__.core.invoke("abrir_endereco", { url: a.href })
+                .catch(err => {
+                    console.warn("abrir_endereco:", err);
+                    toast("Nao foi possivel abrir este endereco.", 4000);
+                });
+        });
+
         function registrarRemocaoDeFotos(ids) {
             if (!ids || ids.length === 0) return;
             // Sem repetidos: quando o titulo nao muda, o id velho e o novo sao o

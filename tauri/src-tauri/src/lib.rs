@@ -524,6 +524,42 @@ fn fechar_janela(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
 }
 
+/// Esquemas que podemos entregar ao sistema. Lista fechada DE PROPOSITO: o
+/// texto vem do campo de comentarios, que o usuario digita, e `file:` ou um
+/// esquema inventado por um aplicativo instalado nao tem por que sair daqui.
+const ESQUEMAS_PERMITIDOS: [&str; 4] = ["http", "https", "kindle", "mailto"];
+
+/// Abre um endereco no aplicativo que o sistema escolher — o navegador para
+/// `https`, o Kindle para `kindle`.
+///
+/// POR QUE ISTO EXISTE: dentro da janela do Tauri um `<a target="_blank">` nao
+/// faz NADA (nao navega, nao abre aplicativo, nao reclama), do mesmo jeito que
+/// acontecia no WKWebView do Mac. Alguem tem de entregar o endereco ao sistema.
+///
+/// O endereco vai como UM argumento, nunca por linha de comando interpretada
+/// (`cmd /C start` partiria o `&` da query em dois comandos).
+#[tauri::command]
+fn abrir_endereco(url: String) -> Result<(), String> {
+    let esquema = url
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !ESQUEMAS_PERMITIDOS.contains(&esquema.as_str()) {
+        return Err(format!("esquema nao permitido: {esquema}"));
+    }
+    #[cfg(target_os = "windows")]
+    let saida = std::process::Command::new("rundll32.exe")
+        .arg("url.dll,FileProtocolHandler")
+        .arg(&url)
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let saida = std::process::Command::new("/usr/bin/open").arg(&url).spawn();
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    let saida = std::process::Command::new("xdg-open").arg(&url).spawn();
+    saida.map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -542,6 +578,7 @@ pub fn run() {
             carregar_removidas,
             registrar_remocoes,
             cancelar_remocoes,
+            abrir_endereco,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");

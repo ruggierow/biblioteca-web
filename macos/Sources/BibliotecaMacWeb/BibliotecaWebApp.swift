@@ -580,6 +580,35 @@ extension AppDelegate: WKNavigationDelegate {
         carregarDoICloud()
         carregarFotosDoICloud()
     }
+
+    /// Entrega ao sistema o endereco que o usuario clicou.
+    ///
+    /// Sem isto o link nos comentarios nao fazia NADA — medido reproduzindo este
+    /// WKWebView: um `<a target="_blank">` nao navega, nao abre o aplicativo e
+    /// nem reporta erro, porque sem WKUIDelegate nao ha janela nova para criar.
+    /// Aqui a navegacao e cancelada e o endereco vai para o NSWorkspace, que
+    /// escolhe o aplicativo: o navegador para `https`, o Kindle para `kindle`.
+    ///
+    /// Fica DENTRO da janela o que e a propria pagina: `file:` (o
+    /// biblioteca.html do pacote), `about:` (as janelas de impressao) e os
+    /// `blob:`/`data:` que as exportacoes usam — mandar esses para fora
+    /// quebraria Exportar e Imprimir.
+    func webView(_ webView: WKWebView,
+                 decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard let url = navigationAction.request.url, let esquema = url.scheme?.lowercased() else {
+            decisionHandler(.allow); return
+        }
+        if url.isFileURL || ["about", "blob", "data"].contains(esquema) {
+            decisionHandler(.allow); return
+        }
+        // Clique num link, ou link que pediu janela nova (targetFrame nil).
+        if navigationAction.navigationType == .linkActivated || navigationAction.targetFrame == nil {
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel); return
+        }
+        decisionHandler(.allow)
+    }
 }
 
 // MARK: - WKScriptMessageHandler — recebe TSV do HTML e grava no iCloud
