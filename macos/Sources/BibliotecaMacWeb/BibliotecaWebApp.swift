@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         
     private var janela: NSWindow!
     private var webView: WKWebView!
+    private let impressor = ImpressorDeHTML()
     private var gravarTimer: Timer?
     private var gravarDatTimer: Timer?
 
@@ -48,6 +49,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "recarregar")
         config.userContentController.add(self, name: "fotosRemovidas")
         config.userContentController.add(self, name: "fotosReadicionadas")
+        config.userContentController.add(self, name: "imprimir")
+        config.userContentController.add(self, name: "salvarArquivo")
         config.userContentController.add(self, name: "grupos")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
@@ -217,6 +220,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Manda o registro de exclusoes para a pagina ANTES das fotos. Sem ele a
     /// mescla do HTML nao tem como saber o que foi apagado, e a capa volta.
+    /// Pergunta onde gravar e grava. So avisa a pagina DEPOIS de escrever: o
+    /// caminho antigo (download por blob dentro do WKWebView) nao escrevia nada
+    /// e mesmo assim anunciava "Planilha salva em ~/Downloads".
+    private func salvarArquivoEscolhendoPasta(nome: String, conteudo: Data) {
+        let painel = NSSavePanel()
+        painel.nameFieldStringValue = nome
+        painel.canCreateDirectories = true
+        painel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+        painel.begin { [weak self] resposta in
+            guard resposta == .OK, let destino = painel.url else { return }   // cancelou: nada a dizer
+            do {
+                try conteudo.write(to: destino, options: .atomic)
+                self?.avisarNaPagina("Planilha salva em \(destino.path)")
+            } catch {
+                self?.avisarNaPagina("Nao foi possivel salvar: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func avisarNaPagina(_ texto: String) {
+        let escapado = texto
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
+            .replacingOccurrences(of: "$", with: "\\$")
+        webView.evaluateJavaScript("if (typeof toast === 'function') toast(`\(escapado)`, 6000);")
+    }
+
     private func injetarRegistroDeRemocoes() {
         let reg = lerRegistro()
         guard let dados = try? JSONSerialization.data(withJSONObject: reg),
@@ -638,6 +668,17 @@ extension AppDelegate: WKScriptMessageHandler {
                   let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
             else { return }
             cancelarRemocoes(ids)
+        case "imprimir":
+            guard let html = message.body as? String else { return }
+            impressor.imprimir(html)
+        case "salvarArquivo":
+            guard let json = message.body as? String,
+                  let dados = json.data(using: .utf8),
+                  let obj = try? JSONSerialization.jsonObject(with: dados) as? [String: String],
+                  let nome = obj["nome"], let base64 = obj["base64"],
+                  let conteudo = Data(base64Encoded: base64)
+            else { return }
+            salvarArquivoEscolhendoPasta(nome: nome, conteudo: conteudo)
         case "grupos":
             guard let json = message.body as? String else { return }
             gravarGrupos(json)
@@ -650,5 +691,53 @@ extension AppDelegate: WKScriptMessageHandler {
         default:
             break
         }
+    }
+}
+
+
+// MARK: - Impressao
+//
+// O `window.print()` NAO existe dentro do WKWebView e o `window.open` devolve
+// nulo sem WKUIDelegate: medido em 07/10/2026, os dois botoes de imprimir do app
+// nao faziam nada, sem erro nenhum. A pagina manda o HTML pronto e quem imprime
+// e o AppKit.
+
+/// Guarda-se a si mesma ate a impressao terminar: um WKWebView fora de tela e
+/// solto assim que a funcao retorna, e o didFinish nunca chegaria.
+final class ImpressorDeHTML: NSObject, WKNavigationDelegate {
+    private var web: WKWebView?
+    private var enquantoImprime: ImpressorDeHTML?
+
+    func imprimir(_ html: String) {
+        let info = NSPrintInfo.shared
+        let largura = info.paperSize.width - info.leftMargin - info.rightMargin
+        let altura = info.paperSize.height - info.topMargin - info.bottomMargin
+        let web = WKWebView(frame: NSRect(x: 0, y: 0, width: largura, height: altura))
+        web.navigationDelegate = self
+        self.web = web
+        self.enquantoImprime = self
+        web.loadHTMLString(html, baseURL: nil)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        let info = NSPrintInfo.shared
+        info.horizontalPagination = .fit
+        info.verticalPagination = .automatic
+        let operacao = webView.printOperation(with: info)
+        operacao.showsPrintPanel = true
+        operacao.showsProgressPanel = true
+        operacao.view?.frame = webView.frame
+        if let janela = NSApp.mainWindow {
+            operacao.runModal(for: janela, delegate: nil, didRun: nil, contextInfo: nil)
+        } else {
+            operacao.run()
+        }
+        self.web = nil
+        self.enquantoImprime = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        self.web = nil
+        self.enquantoImprime = nil
     }
 }

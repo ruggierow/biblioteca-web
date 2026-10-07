@@ -3377,10 +3377,49 @@
             toast("Livro atualizado.");
         });
 
+        /// Imprime um documento HTML montado pela pagina.
+        ///
+        /// Tres ambientes, e o caminho obvio nao serve aos tres. MEDIDO em
+        /// 07/10/2026 no app do Mac: os dois botoes de imprimir nao faziam
+        /// NADA — nenhuma janela nova, nenhum dialogo, nenhum erro. Dentro do
+        /// WKWebView o `window.open` devolve nulo (sem WKUIDelegate nao ha
+        /// janela para criar) e o `window.print()` simplesmente nao existe.
+        ///
+        /// - Mac: o HTML vai para o lado nativo, que imprime com NSPrintOperation.
+        /// - Tauri e navegador: um iframe escondido, que tambem evita o
+        ///   bloqueador de pop-up que barrava a janela nova.
+        function imprimirDocumento(html, titulo) {
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    window.webkit.messageHandlers.imprimir.postMessage(html);
+                    return;
+                } catch (e) {
+                    console.warn("imprimir:", e);
+                    toast("Nao foi possivel imprimir.", 4000);
+                    return;
+                }
+            }
+            const quadro = document.createElement("iframe");
+            quadro.setAttribute("aria-hidden", "true");
+            quadro.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;";
+            quadro.onload = () => {
+                try {
+                    quadro.contentWindow.focus();
+                    quadro.contentWindow.print();
+                } catch (e) {
+                    console.warn("print:", e);
+                    toast("Nao foi possivel imprimir.", 4000);
+                }
+                // Sair cedo demais cancela a impressao em alguns navegadores.
+                setTimeout(() => quadro.remove(), 60000);
+            };
+            document.body.appendChild(quadro);
+            quadro.srcdoc = html;
+        }
+
         // === Impressao individual ===
         function imprimirLivro(livro) {
-            const janela = window.open("", "_blank", "width=520,height=600");
-            janela.document.write(`
+            imprimirDocumento(`
                 <html><head><title>Cadastro do Livro</title>
                 <style>
                     body { font-family: -apple-system, sans-serif; padding: 32px; color: #222; }
@@ -3400,10 +3439,8 @@
                     ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios)}</dd>` : ""}
                     <dt>Grupos de Literatura</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : "Nao"}</dd>
                 </dl>
-                <script>window.onload = () => window.print();<\/script>
                 </body></html>
-            `);
-            janela.document.close();
+            `, "Cadastro do Livro");
         }
 
         // === Impressao de resultados da pesquisa ===
@@ -3580,9 +3617,7 @@
 </body>
 </html>`;
 
-            const janela = window.open("", "_blank", "width=900,height=700");
-            janela.document.write(html);
-            janela.document.close();
+            imprimirDocumento(html, "Resultados da pesquisa");
         }
 
         document.getElementById("btn-imprimir-resultados").addEventListener("click", imprimirResultados);
@@ -3761,10 +3796,37 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             ]);
         }
 
+        /// Bytes para base64 em pedacos: `String.fromCharCode(...bytes)` com um
+        /// arranjo grande estoura a pilha do JavaScript.
+        function base64DeBytes(bytes) {
+            let bruto = "";
+            const passo = 8192;
+            for (let i = 0; i < bytes.length; i += passo) {
+                bruto += String.fromCharCode.apply(null, bytes.subarray(i, i + passo));
+            }
+            return btoa(bruto);
+        }
+
         function exportarResultadosExcel() {
             const filtrados = aplicarFiltros();
             if (filtrados.length === 0) { toast("Nenhum resultado para exportar."); return; }
             const xlsx = gerarXLSX(filtrados);
+            // No app do Mac o download por blob NAO escreve arquivo nenhum, e a
+            // pagina ainda assim anunciava "Planilha salva em ~/Downloads"
+            // (medido em 07/10/2026). Pela ponte quem avisa e o lado nativo, e
+            // so depois de gravar — se voce cancelar o painel, nada e dito.
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try {
+                    window.webkit.messageHandlers.salvarArquivo.postMessage(JSON.stringify({
+                        nome: "resultados_biblioteca.xlsx",
+                        base64: base64DeBytes(xlsx)
+                    }));
+                } catch (e) {
+                    console.warn("salvarArquivo:", e);
+                    toast("Nao foi possivel salvar a planilha.", 4000);
+                }
+                return;
+            }
             const blob = new Blob([xlsx], {type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
