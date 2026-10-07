@@ -1280,8 +1280,57 @@
         /// Os ids vão EXPLÍCITOS: deduzir por diferença entre o que se grava e o
         /// que havia no arquivo seria perigoso — uma memória incompleta (cota
         /// estourada, leitura falha) pareceria uma exclusão em massa.
+        // Espelho em memoria do biblioteca-removidas.json. O arquivo e a verdade;
+        // esta copia existe para a MESCLA poder consultar sem ir ao disco. Quem a
+        // preenche e receberRemocoes(), chamada pelo app nativo na abertura.
+        //
+        // Declarado ANTES de qualquer funcao que o use: `let` nao sobe, e uma
+        // leitura antes da declaracao derruba o script inteiro (ja aconteceu).
+        let _fotosRemovidas = {};
+
+        /// Recebe o registro de exclusoes vindo do app nativo (Mac e Windows).
+        function receberRemocoes(json) {
+            try {
+                const reg = typeof json === "string" ? JSON.parse(json || "{}") : (json || {});
+                _fotosRemovidas = reg && typeof reg === "object" ? reg : {};
+            } catch (e) {
+                console.warn("receberRemocoes:", e);
+                _fotosRemovidas = {};
+            }
+            return Object.keys(_fotosRemovidas).length;
+        }
+
+        /// Tira ids do registro — chamada SEMPRE que uma foto e (re)atribuida a
+        /// um id. Sem isto, fotografar de novo a capa de um livro cuja capa foi
+        /// apagada daria uma foto que some na proxima mescla.
+        function cancelarRemocaoDeFotos(ids) {
+            if (!ids || ids.length === 0) return;
+            ids = ids.filter(Boolean);
+            if (ids.length === 0) return;
+            let mudou = false;
+            for (const id of ids) {
+                if (id in _fotosRemovidas) { delete _fotosRemovidas[id]; mudou = true; }
+            }
+            if (!mudou) return;
+            if (window.__TAURI__) {
+                window.__TAURI__.core.invoke("cancelar_remocoes", { ids })
+                    .catch(e => console.warn("cancelar_remocoes:", e));
+                return;
+            }
+            if (window.__BIBLIOTECA_NATIVE__) {
+                try { window.webkit.messageHandlers.fotosReadicionadas.postMessage(JSON.stringify(ids)); }
+                catch (e) { console.warn("fotosReadicionadas:", e); }
+            }
+        }
+
         function registrarRemocaoDeFotos(ids) {
             if (!ids || ids.length === 0) return;
+            // Sem repetidos: quando o titulo nao muda, o id velho e o novo sao o
+            // mesmo, e mandar duas vezes a mesma coisa confunde quem le o log.
+            ids = [...new Set(ids.filter(Boolean))];
+            if (ids.length === 0) return;
+            const agora = new Date().toISOString().replace(/\.\d+Z$/, "Z");
+            for (const id of ids) _fotosRemovidas[id] = agora;
             if (window.__TAURI__) {
                 window.__TAURI__.core.invoke("registrar_remocoes", { ids })
                     .catch(e => console.warn("registrar_remocoes:", e));
@@ -1300,7 +1349,18 @@
         function receberFotosDoArquivo(json) {
             try {
                 const novas = typeof json === "string" ? JSON.parse(json) : json;
-                fotos = Object.assign({}, fotos, novas);
+                // Mescla so sabe somar: sem este filtro, uma foto apagada aqui
+                // volta na proxima leitura do .dat, porque o outro aparelho ainda
+                // a tem. Quem apaga perde para quem ainda tem o arquivo.
+                const limpas = {};
+                let ignoradas = 0;
+                for (const [id, uri] of Object.entries(novas || {})) {
+                    if (id in _fotosRemovidas) { ignoradas++; continue; }
+                    limpas[id] = uri;
+                }
+                for (const id of Object.keys(_fotosRemovidas)) delete fotos[id];
+                if (ignoradas > 0) console.info("fotos ignoradas por exclusao:", ignoradas);
+                fotos = Object.assign({}, fotos, limpas);
                 _fotosVieramDoArquivo = true;
                 persistirFotosLocal();
                 if (typeof atualizarTudo === "function") atualizarTudo();
@@ -1671,6 +1731,7 @@
                 _datLidoNestaSessao = true;
                 let total = 0;
                 for (const [id, dataUri] of Object.entries(fotosArquivo)) {
+                    if (id in _fotosRemovidas) continue;   // apagada aqui: nao ressuscita
                     fotos[id] = dataUri; // sempre atualiza — não só fotos ausentes
                     total++;
                 }
@@ -2211,13 +2272,21 @@
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
                 paginaAtual = 1;
             }
+            // O registro de exclusoes vem ANTES das fotos: sem ele a mescla nao
+            // tem como saber o que foi apagado, e a capa volta.
+            try {
+                const removidasJson = await inv("carregar_removidas");
+                if (removidasJson) receberRemocoes(removidasJson);
+            } catch (e) {
+                console.warn("carregar_removidas:", e);
+            }
             const fotosJson = await inv("carregar_fotos");
             if (fotosJson) {
                 try {
-                    const fotosArquivo = JSON.parse(fotosJson);
-                    fotos = Object.assign({}, fotos, fotosArquivo);
-                    _fotosVieramDoArquivo = true;
-                    persistirFotosLocal();
+                    // receberFotosDoArquivo() — a MESMA mescla do Mac, que filtra
+                    // pelo registro, marca a origem e persiste. Antes isto era um
+                    // Object.assign solto aqui, e so o Windows ressuscitava capa.
+                    receberFotosDoArquivo(fotosJson);
                 } catch (e) {
                     // Antes este catch era vazio e escondia inclusive JSON quebrado.
                     console.error("Erro ao ler as fotos do arquivo:", e);
@@ -2979,7 +3048,10 @@
             const grupoLiteratura = participa ? lerGruposSelecionados("grupo-checkboxes") : [];
             const livro = { titulo, autores, temas, ano, emprestado: false, comentarios, local, grupoLiteratura };
             normalizarLivro(livro);
-            if (_fotoPendenteCadastro) { fotos[livro.id] = _fotoPendenteCadastro; }
+            if (_fotoPendenteCadastro) {
+                fotos[livro.id] = _fotoPendenteCadastro;
+                cancelarRemocaoDeFotos([livro.id]);
+            }
             biblioteca.push(livro);
             salvar();
             paginaAtual = Math.ceil(biblioteca.length / LIVROS_POR_PAGINA);
@@ -3142,6 +3214,7 @@
                 case "imprimir": imprimirLivro(livro); break;
                 case "remover":
                     if (confirm(`Remover o livro "${livro.titulo}"?`)) {
+                        if (livro.id && fotos[livro.id]) registrarRemocaoDeFotos([livro.id]);
                         if (livro.id) delete fotos[livro.id];
                         biblioteca.splice(indice, 1);
                         salvar(); atualizarTudo();
@@ -3261,12 +3334,21 @@
             livro.grupoLiteratura = editParticipa ? lerGruposSelecionados("edit-grupo-checkboxes") : [];
             if (_fotoPendenteEdicao) {
                 fotos[livro.id] = _fotoPendenteEdicao;
-                if (_oldFotoId !== livro.id) delete fotos[_oldFotoId];
+                cancelarRemocaoDeFotos([livro.id]);
+                if (_oldFotoId !== livro.id) {
+                    if (fotos[_oldFotoId]) registrarRemocaoDeFotos([_oldFotoId]);
+                    delete fotos[_oldFotoId];
+                }
             } else if (_fotoRemovidaEdicao) {
+                // O id MUDA quando o titulo ou o autor sao editados; os dois lados
+                // precisam ir para o registro, senao a foto volta pelo id antigo.
+                registrarRemocaoDeFotos([_oldFotoId, livro.id].filter(id => id && fotos[id]));
                 delete fotos[_oldFotoId];
                 delete fotos[livro.id];
             } else if (_oldFotoId !== livro.id && fotos[_oldFotoId]) {
                 fotos[livro.id] = fotos[_oldFotoId];
+                cancelarRemocaoDeFotos([livro.id]);
+                registrarRemocaoDeFotos([_oldFotoId]);
                 delete fotos[_oldFotoId];
             }
             _fotoPendenteEdicao = null;
@@ -4278,8 +4360,10 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 if (!novoId) return;
                 if (fotos[novoId] && !confirm("Este livro ja tem uma foto. Substituir?")) return;
                 const uri = fotos[orphanId];
+                registrarRemocaoDeFotos([orphanId]);
                 delete fotos[orphanId];
                 fotos[novoId] = uri;
+                cancelarRemocaoDeFotos([novoId]);
                 // salvar() — e nao gravarFotosNoDat() — porque este ultimo so
                 // atende o navegador com .dat vinculado; nos apps do Mac e do
                 // Windows nao ha datHandle e a exclusao nunca chegava ao arquivo.

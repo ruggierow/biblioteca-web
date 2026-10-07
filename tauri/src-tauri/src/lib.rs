@@ -315,6 +315,31 @@ fn registrar_remocoes(ids: Vec<String>) -> Result<usize, String> {
     Ok(reg.len())
 }
 
+/// Tira ids do registro: a capa foi reposta para aquele livro, entao ela pode
+/// voltar a viajar entre os aparelhos. Sem isto, refotografar uma capa apagada
+/// daria uma foto que some na proxima mescla.
+#[tauri::command]
+fn cancelar_remocoes(ids: Vec<String>) -> Result<usize, String> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let mut reg = ler_removidas();
+    let antes = reg.len();
+    for id in &ids {
+        reg.remove(id);
+    }
+    if reg.len() == antes {
+        return Ok(antes);
+    }
+    let caminho = caminho_removidas();
+    if let Some(pai) = caminho.parent() {
+        fs::create_dir_all(pai).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(&reg).map_err(|e| e.to_string())?;
+    fs::write(&caminho, json).map_err(|e| e.to_string())?;
+    Ok(reg.len())
+}
+
 /// Carimbo ISO8601 em UTC, sem dependencia nova: derivado do epoch.
 fn carimbo_iso() -> String {
     let seg = std::time::SystemTime::now()
@@ -516,6 +541,7 @@ pub fn run() {
             iniciar_sessao,
             carregar_removidas,
             registrar_remocoes,
+            cancelar_remocoes,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");

@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "backup")
         config.userContentController.add(self, name: "recarregar")
         config.userContentController.add(self, name: "fotosRemovidas")
+        config.userContentController.add(self, name: "fotosReadicionadas")
         config.userContentController.add(self, name: "grupos")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
@@ -214,7 +215,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Manda o registro de exclusoes para a pagina ANTES das fotos. Sem ele a
+    /// mescla do HTML nao tem como saber o que foi apagado, e a capa volta.
+    private func injetarRegistroDeRemocoes() {
+        let reg = lerRegistro()
+        guard let dados = try? JSONSerialization.data(withJSONObject: reg),
+              let json = String(data: dados, encoding: .utf8) else { return }
+        let escapado = json
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "`", with: "\\`")
+            .replacingOccurrences(of: "$", with: "\\$")
+        let js = """
+        (function() {
+            try {
+                if (typeof receberRemocoes === 'function') receberRemocoes(`\(escapado)`);
+            } catch(e) { console.error('Erro ao injetar registro de remocoes:', e); }
+        })();
+        """
+        webView.evaluateJavaScript(js) { _, error in
+            if let error = error { print("Erro ao injetar registro:", error) }
+        }
+    }
+
+    /// Tira ids do registro — a capa foi reposta, entao ela pode voltar a viajar.
+    private func cancelarRemocoes(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        var reg = lerRegistro()
+        var mudou = false
+        for id in ids where reg.removeValue(forKey: id) != nil { mudou = true }
+        guard mudou else { return }
+        guard let dados = try? JSONSerialization.data(
+            withJSONObject: reg, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? FileManager.default.createDirectory(at: pastaDeDados, withIntermediateDirectories: true)
+        do {
+            try dados.write(to: registroURL, options: .atomic)
+        } catch {
+            print("registro de exclusões: falha ao gravar:", error)
+        }
+    }
+
     private func injetarFotos(_ json: String) {
+        injetarRegistroDeRemocoes()
         let escapado = json
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
@@ -562,6 +603,12 @@ extension AppDelegate: WKScriptMessageHandler {
                   let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
             else { return }
             registrarRemocoes(ids)
+        case "fotosReadicionadas":
+            guard let json = message.body as? String,
+                  let dados = json.data(using: .utf8),
+                  let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
+            else { return }
+            cancelarRemocoes(ids)
         case "grupos":
             guard let json = message.body as? String else { return }
             gravarGrupos(json)
