@@ -3191,6 +3191,13 @@
 
         document.getElementById("filtro-status").addEventListener("change", executarPesquisa);
 
+        // Estes dois faltavam: o texto filtrava ao digitar e o Status ao mudar,
+        // mas marcar "Com foto" ou escolher um grupo nao mexia na lista ate
+        // alguem clicar em Pesquisar. Medido em 07/10/2026: "749 de 749" antes e
+        // depois de marcar a caixa; so o botao mudava para "16 de 749".
+        document.getElementById("filtro-grupo").addEventListener("change", executarPesquisa);
+        document.getElementById("filtro-com-foto").addEventListener("change", executarPesquisa);
+
         ["filtro-chip-tema", "filtro-chip-autor"].forEach(id => {
             document.getElementById(id).addEventListener("input", renderizarCategorias);
         });
