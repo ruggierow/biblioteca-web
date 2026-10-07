@@ -662,6 +662,11 @@
             -webkit-box-orient: vertical;
         }
 
+        /* Com link, tres linhas: o rotulo e curto, mas pode vir depois de um
+           comentario de verdade, e cortar justamente o link seria o pior corte. */
+        .cell-comentario .conteudo:has(a) { -webkit-line-clamp: 3; }
+        .cell-comentario a { font-style: normal; }
+
         .cell-comentario.vazio { color: #cbd2dc; font-style: normal; }
 
         /* Modal */
@@ -2504,7 +2509,7 @@
             const linhas = pagina.map(({ livro, indice }) => {
                 const comentario = (livro.comentarios || "").trim();
                 const cellComentario = comentario
-                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${comLinks(comentario)}</div></td>`
+                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${comLinksCompacto(comentario)}</div></td>`
                     : `<td class="cell-comentario vazio">—</td>`;
                 const local = (livro.local || "").trim();
                 const cellLocal = local
@@ -2968,6 +2973,52 @@
         // um link de divulgacao. A conversao abria o Kindle na BIBLIOTECA, o que
         // parece defeito. Verificado em 06/10/2026 no app 7.68.
         const RE_ENDERECO = /(?:https?:\/\/|kindle:\/\/|www\.)[^\s<>"']+/gi;
+
+        /// Versao da tabela: mostra o ROTULO no lugar do endereco.
+        ///
+        /// A celula tem recorte de duas linhas (`-webkit-line-clamp`), e um
+        /// endereco longo come as duas sozinho — o usuario via metade do
+        /// primeiro link e mais nada, sem poder escolher. Aqui, quando o texto
+        /// traz "Rotulo: endereco", o link aparece como **Rotulo** e o endereco
+        /// sai de cena; o destino continua o mesmo. Sem rotulo, usa o servidor
+        /// (ou "app Kindle", para `kindle://`).
+        ///
+        /// O texto inteiro, com os enderecos a vista, continua no detalhe e na
+        /// impressao, que usam comLinks().
+        function comLinksCompacto(texto) {
+            const bruto = (texto || "").toString();
+            let saida = "", fim = 0, m;
+            RE_ENDERECO.lastIndex = 0;
+            while ((m = RE_ENDERECO.exec(bruto)) !== null) {
+                let antes = bruto.slice(fim, m.index);
+                const achado = m[0];
+                // "Ler o livro: https://..." -> o rotulo vira o texto do link
+                // O rotulo para em pontuacao de frase: sem isso, um comentario
+                // como "…funesto. Ler o livro: http://…" virava o rotulo
+                // "entimento funesto. Ler o livro" e deixava "press" solto.
+                const rot = antes.match(/([^|;·.,!?\n]{1,30}?)\s*:\s*$/);
+                let nome;
+                if (rot) {
+                    nome = rot[1].trim();
+                    antes = antes.slice(0, antes.length - rot[0].length);
+                } else if (/^kindle:/i.test(achado)) {
+                    nome = "app Kindle";
+                } else {
+                    const h = achado.replace(/^[a-z]+:\/\//i, "").split("/")[0];
+                    nome = h.replace(/^www\./i, "");
+                }
+                // Tirar o rotulo do texto comum nao pode colar o separador no
+                // link: " | Abrir...:" vira " |" e o <a> encostaria no "|".
+                if (rot && antes && !/\s$/.test(antes)) antes += " ";
+                saida += escapeHtml(antes);
+                const destino = achado.toLowerCase().startsWith("www.") ? "https://" + achado : achado;
+                saida += `<a href="${escapeHtml(destino)}" target="_blank" rel="noopener noreferrer"`
+                      + ` title="${escapeHtml(achado)}">${escapeHtml(nome)}</a>`;
+                fim = m.index + achado.length;
+            }
+            saida += escapeHtml(bruto.slice(fim));
+            return saida;
+        }
 
         function comLinks(texto) {
             const bruto = (texto || "").toString();
