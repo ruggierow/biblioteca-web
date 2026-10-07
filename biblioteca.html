@@ -2641,6 +2641,31 @@
             ).join("");
         }
 
+        // A secao "Editar livro" estava SO NA TELA: o seletor era preenchido, mas o
+        // botao nao tinha ouvinte nenhum e o campo de filtro tambem nao — clicar
+        // ou digitar ali nao fazia nada. Medido em 07/10/2026 com a base real na
+        // 1.9.1: 749 opcoes no seletor, o clique nao abria a janela, e filtrar
+        // continuava com 749. So dava para editar pela tabela (o botao Editar da
+        // linha ou a miniatura da capa).
+        document.getElementById("edit-busca").addEventListener("input", renderizarSeletorEdicao);
+
+        document.getElementById("edit-busca").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); abrirEdicaoSelecionada(); }
+        });
+
+        document.getElementById("btn-abrir-edicao").addEventListener("click", abrirEdicaoSelecionada);
+
+        function abrirEdicaoSelecionada() {
+            const seletor = document.getElementById("edit-seletor");
+            const indice = parseInt(seletor.value, 10);
+            // O value e o indice na biblioteca; "Nenhum livro encontrado" tem value "".
+            if (Number.isNaN(indice) || !biblioteca[indice]) {
+                toast("Escolha um livro na lista para editar.");
+                return;
+            }
+            abrirEdicao(indice);
+        }
+
         async function buscarPorISBN() {
             const isbn = document.getElementById("isbn-input").value.replace(/[-\s]/g, "");
             const status = document.getElementById("isbn-status");
