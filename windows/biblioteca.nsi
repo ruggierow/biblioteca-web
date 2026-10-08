@@ -18,7 +18,7 @@ SetCompressor /SOLID lzma
 !include "LogicLib.nsh"
 
 !define APP_NAME        "Biblioteca"
-!define APP_VERSION     "1.9.6"
+!define APP_VERSION     "1.9.7"
 !define APP_PUBLISHER   "Wilson"
 !define APP_ICON        "biblioteca.ico"
 !define APP_EXE         "Biblioteca.exe"
