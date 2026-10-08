@@ -560,6 +560,46 @@ fn abrir_endereco(url: String) -> Result<(), String> {
     saida.map(|_| ()).map_err(|e| e.to_string())
 }
 
+/// Poe texto na area de transferencia.
+///
+/// O aplicativo Kindle abre na biblioteca e nao aceita rota de busca; com o
+/// titulo copiado, basta colar na busca dele. Pelo lado nativo porque dentro da
+/// janela do WebView a API do navegador nao e confiavel.
+///
+/// Passa por ARQUIVO em UTF-8 e `Get-Content -Encoding UTF8`, nao por cano para
+/// o `clip`: o `clip` interpreta a entrada na pagina de codigo do console, e
+/// titulo brasileiro e cheio de acento — "A paixao segundo G. H." sairia torto.
+#[tauri::command]
+fn copiar_texto(texto: String) -> Result<(), String> {
+    if texto.trim().is_empty() {
+        return Err("nada a copiar".into());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let tmp = std::env::temp_dir().join("biblioteca-copiar.txt");
+        fs::write(&tmp, texto.as_bytes()).map_err(|e| e.to_string())?;
+        let script = format!(
+            "Set-Clipboard -Value (Get-Content -Raw -Encoding UTF8 -LiteralPath '{}')",
+            tmp.display()
+        );
+        let saida = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let _ = fs::remove_file(&tmp);
+        if !saida.status.success() {
+            return Err(String::from_utf8_lossy(&saida.stderr).trim().to_string());
+        }
+        return Ok(());
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = texto;
+        Err("area de transferencia nao implementada nesta plataforma".into())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -579,6 +619,7 @@ pub fn run() {
             registrar_remocoes,
             cancelar_remocoes,
             abrir_endereco,
+            copiar_texto,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");

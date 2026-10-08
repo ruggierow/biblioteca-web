@@ -51,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "fotosReadicionadas")
         config.userContentController.add(self, name: "imprimir")
         config.userContentController.add(self, name: "salvarArquivo")
+        config.userContentController.add(self, name: "copiar")
         config.userContentController.add(self, name: "grupos")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
@@ -668,6 +669,12 @@ extension AppDelegate: WKScriptMessageHandler {
                   let ids = try? JSONSerialization.jsonObject(with: dados) as? [String]
             else { return }
             cancelarRemocoes(ids)
+        case "copiar":
+            // `navigator.clipboard` nao existe numa pagina `file:` (nao e
+            // contexto seguro), entao quem copia e o AppKit.
+            guard let texto = message.body as? String, !texto.isEmpty else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(texto, forType: .string)
         case "imprimir":
             guard let html = message.body as? String else { return }
             impressor.imprimir(html)

@@ -1328,6 +1328,50 @@
             }
         }
 
+        /// Copia o titulo quando o link do Kindle e clicado.
+        ///
+        /// TRES caminhos, porque dentro dos aplicativos a API do navegador nao
+        /// e confiavel: a pagina do Mac vem de `file:`, que nao e contexto
+        /// seguro, e `navigator.clipboard` fica indisponivel. Quem copia de
+        /// verdade e o lado nativo; o navegador e o ultimo recurso.
+        function copiarTexto(texto) {
+            if (window.__TAURI__) {
+                return window.__TAURI__.core.invoke("copiar_texto", { texto });
+            }
+            if (window.__BIBLIOTECA_NATIVE__) {
+                window.webkit.messageHandlers.copiar.postMessage(texto);
+                return Promise.resolve();
+            }
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(texto);
+            }
+            // Navegador antigo ou sem contexto seguro: o jeito de 2010.
+            const caixa = document.createElement("textarea");
+            caixa.value = texto;
+            caixa.setAttribute("readonly", "");
+            caixa.style.cssText = "position:fixed;top:-1000px;opacity:0;";
+            document.body.appendChild(caixa);
+            caixa.select();
+            let deu = false;
+            try { deu = document.execCommand("copy"); } catch (e) { deu = false; }
+            caixa.remove();
+            return deu ? Promise.resolve() : Promise.reject(new Error("sem area de transferencia"));
+        }
+
+        document.addEventListener("click", (e) => {
+            const a = e.target.closest && e.target.closest("a[data-copiar]");
+            if (!a) return;
+            const titulo = a.getAttribute("data-copiar");
+            copiarTexto(titulo)
+                .then(() => toast(`Titulo copiado: ${titulo} — cole na busca do Kindle.`, 6000))
+                .catch(err => {
+                    console.warn("copiar:", err);
+                    toast("Nao foi possivel copiar o titulo.", 4000);
+                });
+            // o link segue o seu caminho: quem abre o Kindle e o interceptador
+            // de baixo (Tauri) ou o decidePolicyFor (Mac).
+        });
+
         /// No Tauri (Windows) um link nao faz nada sozinho: a janela nao abre
         /// aba nova nem entrega o endereco ao sistema. Entao interceptamos o
         /// clique e pedimos ao lado nativo que abra. No Mac isto NAO e preciso —
@@ -2509,7 +2553,7 @@
             const linhas = pagina.map(({ livro, indice }) => {
                 const comentario = (livro.comentarios || "").trim();
                 const cellComentario = comentario
-                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${comLinksCompacto(comentario)}</div></td>`
+                    ? `<td class="cell-comentario" title="${escapeHtml(comentario)}"><div class="conteudo">${comLinksCompacto(comentario, livro.titulo)}</div></td>`
                     : `<td class="cell-comentario vazio">—</td>`;
                 const local = (livro.local || "").trim();
                 const cellLocal = local
@@ -2985,7 +3029,7 @@
         ///
         /// O texto inteiro, com os enderecos a vista, continua no detalhe e na
         /// impressao, que usam comLinks().
-        function comLinksCompacto(texto) {
+        function comLinksCompacto(texto, titulo) {
             const bruto = (texto || "").toString();
             let saida = "", fim = 0, m;
             RE_ENDERECO.lastIndex = 0;
@@ -3013,6 +3057,7 @@
                 saida += escapeHtml(antes);
                 const destino = achado.toLowerCase().startsWith("www.") ? "https://" + achado : achado;
                 saida += `<a href="${escapeHtml(destino)}" target="_blank" rel="noopener noreferrer"`
+                      + atributoCopiar(destino, titulo)
                       + ` title="${escapeHtml(achado)}">${escapeHtml(nome)}</a>`;
                 fim = m.index + achado.length;
             }
@@ -3020,7 +3065,19 @@
             return saida;
         }
 
-        function comLinks(texto) {
+        /// O link do Kindle leva o titulo junto, para ser copiado no clique.
+        ///
+        /// O aplicativo Kindle abre na BIBLIOTECA, nunca no livro — nao ha rota
+        /// de busca em `kindle://` (o pacote do 7.68 tem uma unica cadeia desse
+        /// esquema). Entao o titulo vai para a area de transferencia e basta
+        /// colar na busca do Kindle. So no link do Kindle: o do leitor da web
+        /// abre o livro sozinho e nao tem por que mexer na area de transferencia.
+        function atributoCopiar(destino, titulo) {
+            if (!titulo || !/^kindle:/i.test(destino)) return "";
+            return ` data-copiar="${escapeHtml(titulo)}"`;
+        }
+
+        function comLinks(texto, titulo) {
             const bruto = (texto || "").toString();
             let saida = "", fim = 0;
             RE_ENDERECO.lastIndex = 0;
@@ -3029,7 +3086,9 @@
                 saida += escapeHtml(bruto.slice(fim, m.index));
                 const achado = m[0];
                 const destino = achado.toLowerCase().startsWith("www.") ? "https://" + achado : achado;
-                saida += `<a href="${escapeHtml(destino)}" target="_blank" rel="noopener noreferrer">${escapeHtml(achado)}</a>`;
+                saida += `<a href="${escapeHtml(destino)}" target="_blank" rel="noopener noreferrer"`
+               + atributoCopiar(destino, titulo)
+               + `>${escapeHtml(achado)}</a>`;
                 fim = m.index + achado.length;
             }
             saida += escapeHtml(bruto.slice(fim));
@@ -3519,7 +3578,7 @@
                     <dt>Ano</dt><dd>${livro.ano}</dd>
                     <dt>Status</dt><dd>${livro.emprestado ? "Emprestado" : "Disponivel"}</dd>
                     ${(livro.local || "").trim() ? `<dt>Local</dt><dd>${escapeHtml(livro.local)}</dd>` : ""}
-                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios)}</dd>` : ""}
+                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios, livro.titulo)}</dd>` : ""}
                     <dt>Grupos de Literatura</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : "Nao"}</dd>
                 </dl>
                 </body></html>
