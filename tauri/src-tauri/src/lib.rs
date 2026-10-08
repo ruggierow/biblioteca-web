@@ -534,30 +534,83 @@ const ESQUEMAS_PERMITIDOS: [&str; 4] = ["http", "https", "kindle", "mailto"];
 ///
 /// POR QUE ISTO EXISTE: dentro da janela do Tauri um `<a target="_blank">` nao
 /// faz NADA (nao navega, nao abre aplicativo, nao reclama), do mesmo jeito que
-/// acontecia no WKWebView do Mac. Alguem tem de entregar o endereco ao sistema.
+/// acontecia no WKWebView do Mac.
 ///
-/// O endereco vai como UM argumento, nunca por linha de comando interpretada
-/// (`cmd /C start` partiria o `&` da query em dois comandos).
+/// POR QUE PELO POWERSHELL: a primeira versao usava
+/// `rundll32 url.dll,FileProtocolHandler`. Medido em 08/10/2026 no Windows do
+/// usuario: o `kindle://` abria e o `https://read.amazon.com/?asin=…` nao fazia
+/// nada — o FileProtocolHandler se perde com `?` e `&` na consulta. O
+/// `Start-Process` nao tem esse problema, e ja se provou nesta maquina na copia
+/// para a area de transferencia.
+///
+/// A URL vai por VARIAVEL DE AMBIENTE, nunca interpolada no comando: ela vem do
+/// campo de comentarios, que e texto do usuario, e aspas ali dentro poderiam
+/// virar outro comando.
 #[tauri::command]
 fn abrir_endereco(url: String) -> Result<(), String> {
-    let esquema = url
-        .split(':')
-        .next()
-        .unwrap_or("")
-        .to_ascii_lowercase();
+    let esquema = url.split(':').next().unwrap_or("").to_ascii_lowercase();
     if !ESQUEMAS_PERMITIDOS.contains(&esquema.as_str()) {
         return Err(format!("esquema nao permitido: {esquema}"));
     }
+    // Aspas nao existem em endereco legitimo e sao o unico jeito de escapar do
+    // argumento no cmd. Sem elas, nada do que vem do comentario vira comando.
+    if url.contains('"') || url.chars().any(|c| c.is_control()) {
+        return Err("endereco com caractere proibido".into());
+    }
+
     #[cfg(target_os = "windows")]
-    let saida = std::process::Command::new("rundll32.exe")
-        .arg("url.dll,FileProtocolHandler")
-        .arg(&url)
-        .spawn();
+    {
+        use std::process::Command;
+        let mut queixas: Vec<String> = Vec::new();
+
+        // 1) o jeito classico: o `start` do proprio cmd. As aspas protegem o
+        //    `&` da consulta, que sem elas partiria o comando em dois.
+        match Command::new("cmd")
+            .args(["/C", "start", "", url.as_str()])
+            .status()
+        {
+            Ok(st) if st.success() => return Ok(()),
+            Ok(st) => queixas.push(format!("cmd start saiu {st}")),
+            Err(e) => queixas.push(format!("cmd start: {e}")),
+        }
+
+        // 2) PowerShell, com a URL por variavel de ambiente — nunca interpolada.
+        match Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command",
+                   "Start-Process -FilePath $env:BIBLIOTECA_URL"])
+            .env("BIBLIOTECA_URL", &url)
+            .output()
+        {
+            Ok(o) if o.status.success() => return Ok(()),
+            Ok(o) => queixas.push(format!(
+                "Start-Process: {}", String::from_utf8_lossy(&o.stderr).trim())),
+            Err(e) => queixas.push(format!("Start-Process: {e}")),
+        }
+
+        // 3) o caminho antigo. Da conta de `kindle://`, mas se perde com `?` e
+        //    `&` — foi assim que o link do leitor nao abria nada em 08/10/2026.
+        match Command::new("rundll32.exe")
+            .arg("url.dll,FileProtocolHandler")
+            .arg(&url)
+            .spawn()
+        {
+            Ok(_) => return Ok(()),
+            Err(e) => queixas.push(format!("rundll32: {e}")),
+        }
+
+        return Err(queixas.join(" | "));
+    }
+
     #[cfg(target_os = "macos")]
-    let saida = std::process::Command::new("/usr/bin/open").arg(&url).spawn();
+    {
+        let saida = std::process::Command::new("/usr/bin/open").arg(&url).spawn();
+        return saida.map(|_| ()).map_err(|e| e.to_string());
+    }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-    let saida = std::process::Command::new("xdg-open").arg(&url).spawn();
-    saida.map(|_| ()).map_err(|e| e.to_string())
+    {
+        let saida = std::process::Command::new("xdg-open").arg(&url).spawn();
+        saida.map(|_| ()).map_err(|e| e.to_string())
+    }
 }
 
 /// Poe texto na area de transferencia.
