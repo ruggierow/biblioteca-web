@@ -524,6 +524,54 @@ fn fechar_janela(window: tauri::Window) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
 }
 
+/// O navegador que o usuario escolheu para `https`, lido do registro, com a
+/// linha de comando ja montada para este endereco.
+///
+/// Caminho: HKCU\…\UrlAssociations\https\UserChoice -> ProgId, e dai
+/// HKCR\<ProgId>\shell\open\command, que vem como
+/// `"C:\…\chrome.exe" --single-argument %1`. O `%1` vira o endereco, e o
+/// endereco NUNCA passa por interpretador de linha de comando: vai como
+/// argumento, direto ao executavel.
+#[cfg(target_os = "windows")]
+fn navegador_escolhido(url: &str) -> Option<(String, Vec<String>)> {
+    use std::process::Command;
+
+    let valor = |chave: &str, nome: &str| -> Option<String> {
+        let mut c = Command::new("reg");
+        c.args(["query", chave]);
+        if nome.is_empty() { c.arg("/ve"); } else { c.args(["/v", nome]); }
+        let saida = c.output().ok()?;
+        let texto = String::from_utf8_lossy(&saida.stdout).to_string();
+        let linha = texto.lines().find(|l| l.contains("REG_SZ"))?;
+        Some(linha.split("REG_SZ").nth(1)?.trim().to_string())
+    };
+
+    let progid = valor(
+        "HKCU\\SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice",
+        "ProgId",
+    )?;
+    let comando = valor(&format!("HKCR\\{progid}\\shell\\open\\command"), "")?;
+
+    // "C:\…\chrome.exe" --single-argument %1   ->   exe + argumentos
+    let (exe, resto) = if let Some(fim) = comando.strip_prefix('"').and_then(|r| r.find('"').map(|i| (r[..i].to_string(), r[i + 1..].to_string()))) {
+        fim
+    } else {
+        let mut partes = comando.splitn(2, ' ');
+        (partes.next()?.to_string(), partes.next().unwrap_or("").to_string())
+    };
+
+    let mut argumentos: Vec<String> = resto
+        .split_whitespace()
+        .filter(|a| !a.is_empty())
+        .map(|a| a.trim_matches('"').to_string())
+        .collect();
+    match argumentos.iter().position(|a| a == "%1") {
+        Some(i) => argumentos[i] = url.to_string(),
+        None => argumentos.push(url.to_string()),
+    }
+    Some((exe, argumentos))
+}
+
 /// Esquemas que podemos entregar ao sistema. Lista fechada DE PROPOSITO: o
 /// texto vem do campo de comentarios, que o usuario digita, e `file:` ou um
 /// esquema inventado por um aplicativo instalado nao tem por que sair daqui.
@@ -562,6 +610,27 @@ fn abrir_endereco(url: String) -> Result<(), String> {
     {
         use std::process::Command;
         let mut queixas: Vec<String> = Vec::new();
+
+        // 0) O navegador que o usuario escolheu, executado DIRETO.
+        //
+        // Medido em 09/10/2026: pedir ao sistema "abra este endereco" (o `start`
+        // do cmd) com o Windows rodando no Parallels faz o link ser desviado
+        // para o macOS, e la ele acaba no VMware Fusion em vez do navegador. A
+        // integracao de aplicativos do Parallels nao e nossa para consertar;
+        // sair da cadeia de associacoes e.
+        //
+        // A escolha continua sendo a do usuario: ela vem do registro dele.
+        // SO para pagina da web. O `kindle://` tem de continuar indo pelo
+        // sistema, senao abriria no navegador — e no Windows ele ja funciona.
+        if esquema == "http" || esquema == "https" {
+            match navegador_escolhido(&url) {
+                Some((exe, argumentos)) => match Command::new(&exe).args(&argumentos).spawn() {
+                    Ok(_) => return Ok(()),
+                    Err(e) => queixas.push(format!("{exe}: {e}")),
+                },
+                None => queixas.push("nao achei o navegador no registro".into()),
+            }
+        }
 
         // 1) o jeito classico: o `start` do proprio cmd. As aspas protegem o
         //    `&` da consulta, que sem elas partiria o comando em dois.
