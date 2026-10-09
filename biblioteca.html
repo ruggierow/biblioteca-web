@@ -2715,6 +2715,21 @@
             abrirEdicao(indice);
         }
 
+        // Guarda o ISBN no campo de comentarios, no mesmo padrao "Rotulo: valor"
+        // que ja se usa ali para Editora, Ler e Kindle. Nao vira coluna nova
+        // porque o leitor do motor-web DESCARTA linha com 9 campos — o livro
+        // sumiria no Mac e no Windows, e o salvamento automatico apagaria.
+        // Idempotente: reler o mesmo livro nao duplica, e reler com outro ISBN
+        // substitui (a leitura mais recente vence).
+        function comISBN(texto, isbn) {
+            const limpo = (isbn || "").replace(/[^0-9Xx]/g, "").toUpperCase();
+            if (!limpo) return texto || "";
+            const t = (texto || "").trim();
+            const marca = /ISBN:\s*[0-9Xx-]+/;
+            if (marca.test(t)) return t.replace(marca, "ISBN: " + limpo);
+            return t ? t + " | ISBN: " + limpo : "ISBN: " + limpo;
+        }
+
         async function buscarPorISBN() {
             const isbn = document.getElementById("isbn-input").value.replace(/[-\s]/g, "");
             const status = document.getElementById("isbn-status");
@@ -2725,6 +2740,7 @@
             }
             status.textContent = "Buscando…";
             status.style.color = "var(--muted)";
+            const cmt = document.getElementById("comentarios");
             try {
                 // Tentativa 1: Brasil API — agrega CBL, Mercado Editorial, Google Books e Open Library.
                 // Melhor cobertura para livros brasileiros (prefixos 978-85 e 978-65).
@@ -2741,6 +2757,7 @@
                         if (dataBR.publisher) extras.push("Editora: " + dataBR.publisher);
                         if (extras.length)    document.getElementById("comentarios").value = extras.join(" | ");
                         const fonte = dataBR.provider || "CBL";
+                        cmt.value = comISBN(cmt.value, isbn);
                         status.textContent = `Campos preenchidos (Brasil API · ${fonte}).`;
                         status.style.color = "green";
                         return;
@@ -2758,6 +2775,7 @@
                         if (info.authors?.length)    popularCampos("autores-container", info.authors, "autor");
                         if (info.categories?.length) popularCampos("temas-container", info.categories.slice(0, 3), "tema");
                         if (info.publisher)          document.getElementById("comentarios").value = "Editora: " + info.publisher;
+                        cmt.value = comISBN(cmt.value, isbn);
                         status.textContent = "Campos preenchidos (Google Books).";
                         status.style.color = "green";
                         return;
@@ -2775,11 +2793,13 @@
                         if (livroOL.authors?.length)     popularCampos("autores-container", livroOL.authors.map(a => a.name), "autor");
                         if (livroOL.subjects?.length)    popularCampos("temas-container", livroOL.subjects.slice(0, 3).map(s => s.name), "tema");
                         if (livroOL.publishers?.length)  document.getElementById("comentarios").value = "Editora: " + livroOL.publishers.map(p => p.name).join(", ");
+                        cmt.value = comISBN(cmt.value, isbn);
                         status.textContent = "Campos preenchidos (Open Library).";
                         status.style.color = "green";
                         return;
                     }
                 }
+                cmt.value = comISBN(cmt.value, isbn);
                 status.textContent = "ISBN não encontrado em nenhuma base de dados.";
                 status.style.color = "#c0392b";
             } catch {
