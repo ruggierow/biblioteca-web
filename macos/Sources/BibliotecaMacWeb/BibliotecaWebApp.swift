@@ -342,13 +342,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Gravar fotos no iCloud (debounce 1 s)
 
+    /// Fila SERIAL para tudo que toca o `biblioteca.dat`.
+    ///
+    /// O timer dispara na linha principal, e era ali mesmo que o backup
+    /// automático e a gravação aconteciam — com o arquivo passando de 39 MB.
+    /// O backup sozinho já lê o arquivo inteiro, lê o backup anterior e
+    /// compara os dois. A janela congelava um segundo depois de cada mudança
+    /// de capa, e também no arranque, sem dizer nada.
+    ///
+    /// Sendo serial, ela também impede que duas gravações do mesmo arquivo se
+    /// cruzem.
+    private let filaDat = DispatchQueue(label: "biblioteca.dat", qos: .utility)
+
     private func agendarGravacaoDat(_ json: String) {
         gravarDatTimer?.invalidate()
+        // O timer continua no run loop principal — é só o amortecedor de 1 s,
+        // e não custa nada. O trabalho é que sai de lá.
         gravarDatTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-            self?.gravarDatNoICloud(json)
+            guard let self else { return }
+            self.filaDat.async { self.gravarDatNoICloud(json) }
         }
     }
 
+    /// Roda na `filaDat`, nunca na linha principal: não pode tocar a tela a não
+    /// ser voltando para a fila principal, como faz o alerta de erro abaixo.
     private func gravarDatNoICloud(_ json: String) {
         let url = iCloudDatURL
         backupAutomatico(url, maximo: maxBackupDat, feito: &backupDatFeito)
