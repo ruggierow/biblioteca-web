@@ -143,22 +143,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Carregar fotos do iCloud
 
+    /// Diz à página o que está acontecendo. É barato e roda ANTES do trabalho
+    /// pesado: o WKWebView desenha noutro processo, então a mensagem aparece
+    /// mesmo com a linha principal deste app travada logo em seguida.
+    private func avisarCarregando(_ detalhe: String) {
+        let limpo = detalhe.replacingOccurrences(of: "`", with: "'")
+        webView.evaluateJavaScript(
+            "if (typeof mostrarCarregando === 'function') mostrarCarregando(`\(limpo)`);")
+    }
+
+    private func pararAviso() {
+        webView.evaluateJavaScript(
+            "if (typeof esconderCarregando === 'function') esconderCarregando();")
+    }
+
     private func carregarFotosDoICloud() {
         let url = iCloudDatURL
         let fm = FileManager.default
 
         // Se biblioteca.dat ainda não existe, exporta o localStorage atual para criá-lo
         guard fm.fileExists(atPath: url.path) else {
+            pararAviso()
             exportarLocalStorageParaICloud()
             return
         }
 
         if (try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?
             .ubiquitousItemDownloadingStatus == .some(.notDownloaded) {
+            avisarCarregando("Baixando as capas do iCloud. O arquivo ainda não está neste Mac.")
             try? fm.startDownloadingUbiquitousItem(at: url)
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { self.carregarFotosDoICloud() }
             return
         }
+
+        // O tamanho sai dos atributos do arquivo: é instantâneo, e transforma
+        // uma espera muda numa espera explicada.
+        let bytes = (try? fm.attributesOfItem(atPath: url.path)[.size] as? Int) ?? nil
+        let medida = ByteCountFormatter.string(fromByteCount: Int64(bytes ?? 0), countStyle: .file)
+        avisarCarregando(bytes == nil
+            ? "Carregando as capas dos livros."
+            : "Carregando as capas dos livros — \(medida). Isto leva alguns segundos.")
 
         do {
             let json = try String(contentsOf: url, encoding: .utf8)
@@ -171,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         } catch {
             print("Erro ao ler biblioteca.dat:", error)
+            pararAviso()
         }
     }
 

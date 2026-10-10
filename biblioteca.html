@@ -765,9 +765,42 @@
         .foto-area { display:flex; align-items:flex-start; gap:12px; margin-top:4px; }
         .foto-preview-capa { width:96px; height:96px; border-radius:8px; object-fit:cover; border:1px solid var(--border); display:block; }
         .foto-placeholder { width:96px; height:96px; border-radius:8px; border:2px dashed #c8d5ea; display:flex; align-items:center; justify-content:center; flex-direction:column; color:var(--muted); font-size:11px; cursor:pointer; background:#f8f9fb; text-align:center; padding:8px; gap:4px; user-select:none; }
+
+        /* ===================================================================
+           AVISO DE CARREGAMENTO
+           O biblioteca.dat passa de 39 MB. O app nativo le o arquivo, escapa a
+           string e so entao entrega ao JavaScript, que ainda faz JSON.parse —
+           sao varios segundos com a janela ja desenhada e MUDA, parecendo
+           pronta. O usuario clicava e nada respondia.
+
+           Este aviso vem no HTML e e visivel por padrao: aparece no primeiro
+           quadro, antes de qualquer script rodar. O WKWebView desenha em outro
+           processo, entao ele continua na tela (e girando) enquanto o lado
+           nativo esta travado.
+           =================================================================== */
+        #carregando {
+            position: fixed; inset: 0; z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 18px; background: var(--bg); text-align: center; padding: 24px;
+        }
+        #carregando.oculto { display: none; }
+        #carregando .giro {
+            width: 44px; height: 44px; border-radius: 50%;
+            border: 4px solid var(--border); border-top-color: var(--primary);
+            animation: carregando-giro 0.9s linear infinite;
+        }
+        @keyframes carregando-giro { to { transform: rotate(360deg); } }
+        #carregando .titulo { font-size: 17px; font-weight: 600; color: #1f2937; }
+        #carregando .detalhe { font-size: 13px; color: var(--muted); max-width: 32em; line-height: 1.5; }
+        @media (prefers-reduced-motion: reduce) { #carregando .giro { animation: none; } }
     </style>
 </head>
 <body>
+    <div id="carregando">
+        <div class="giro"></div>
+        <div class="titulo">Abrindo a biblioteca…</div>
+        <div class="detalhe" id="carregando-detalhe">Lendo os livros e as capas. As capas são a parte demorada.</div>
+    </div>
     <header>
         <div style="display:flex; align-items:center; gap:16px;">
             <img src="data:image/png;base64,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"
@@ -1413,6 +1446,42 @@
 
         /// Recebe o conteúdo do biblioteca.dat vindo de um app nativo, mescla com
         /// o que está em memória e marca a origem. Chamada pelo app do Mac.
+        // O aviso de carregamento comeca VISIVEL (vem assim do HTML) e e o app
+        // nativo que decide quando tira-lo. Num navegador comum nao ha ponte, e
+        // ai ele sai sozinho no primeiro quadro: la os dados vem do
+        // localStorage e nao ha espera.
+        let _prazoDoAviso = null;
+        function mostrarCarregando(detalhe) {
+            const el = document.getElementById("carregando");
+            if (!el) return;
+            if (detalhe) {
+                const d = document.getElementById("carregando-detalhe");
+                if (d) d.textContent = detalhe;
+            }
+            el.classList.remove("oculto");
+            // Rede de seguranca: se a injecao falhar, o aviso NAO pode ficar
+            // eterno — seria trocar uma tela morta por outra.
+            clearTimeout(_prazoDoAviso);
+            _prazoDoAviso = setTimeout(() => {
+                if (!el.classList.contains("oculto")) {
+                    esconderCarregando();
+                    if (typeof toast === "function") toast("A carga demorou mais que o esperado. Se faltar capa, use Recarregar.", 6000);
+                }
+            }, 45000);
+        }
+        function esconderCarregando() {
+            clearTimeout(_prazoDoAviso);
+            const el = document.getElementById("carregando");
+            if (el) el.classList.add("oculto");
+        }
+        // Sem ponte nativa (navegador comum): nada a esperar.
+        window.addEventListener("DOMContentLoaded", () => {
+            const temPonte = !!(window.__TAURI__ ||
+                (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.salvar));
+            if (!temPonte) requestAnimationFrame(() => requestAnimationFrame(esconderCarregando));
+            else mostrarCarregando();
+        });
+
         function receberFotosDoArquivo(json) {
             try {
                 const novas = typeof json === "string" ? JSON.parse(json) : json;
@@ -1431,9 +1500,11 @@
                 _fotosVieramDoArquivo = true;
                 persistirFotosLocal();
                 if (typeof atualizarTudo === "function") atualizarTudo();
+                esconderCarregando();
                 return Object.keys(fotos).length;
             } catch (e) {
                 console.error("Erro ao receber fotos do arquivo:", e);
+                esconderCarregando();
                 return -1;
             }
         }
@@ -2333,6 +2404,7 @@
                     toast(diag, 6000);
                 } catch (_) {}
             }
+            mostrarCarregando("Lendo a lista de livros.");
             const tsv = await inv("carregar_tsv");
             if (tsv) {
                 biblioteca = parseTSV(tsv);
@@ -2347,6 +2419,10 @@
             } catch (e) {
                 console.warn("carregar_removidas:", e);
             }
+            // As capas sao a parte demorada: o arquivo passa de 39 MB, e o
+            // JSON.parse dele trava a pagina por alguns segundos. Dizer isso
+            // antes e o que separa "esta carregando" de "travou".
+            mostrarCarregando("Carregando as capas dos livros. Isto leva alguns segundos.");
             const fotosJson = await inv("carregar_fotos");
             if (fotosJson) {
                 try {
@@ -2362,6 +2438,7 @@
             }
             atualizarTudo();
             atualizarBannerSync("ok");
+            esconderCarregando();   // tambem quando nao ha .dat: senao o aviso fica eterno
             return { livros: biblioteca.length, fotos: Object.keys(fotos).length };
         }
 
