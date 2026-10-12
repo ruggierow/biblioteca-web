@@ -1,0 +1,11 @@
+{
+  "name": "biblioteca-testes",
+  "private": true,
+  "description": "Testes funcionais do motor-web (a pagina que serve o Mac e o Windows)",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  }
+}
