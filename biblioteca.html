@@ -1603,6 +1603,7 @@
             livro.id = gerarId(livro.titulo, autores);
             livro.comentarios = (livro.comentarios || "").toString();
             livro.local = (livro.local || "").toString();
+            livro.pais = (livro.pais || "").toString().trim().toUpperCase();
             if (typeof livro.grupoLiteratura === "boolean") {
                 livro.grupoLiteratura = livro.grupoLiteratura ? [1] : [];
             } else if (!Array.isArray(livro.grupoLiteratura)) {
@@ -1731,8 +1732,13 @@
         }
 
         function serializarTSV() {
-            return biblioteca.map(l =>
-                [
+            // A 9a coluna so e ESCRITA quando ha pais. Escrever sempre deixaria
+            // um tabulador no fim de toda linha e faria o arquivo inteiro
+            // aparecer como alterado a cada gravacao — ruido em todo diff, em
+            // todo espelho e em toda comparacao de copias. Linhas de 8 e de 9
+            // campos convivem: os quatro leitores aceitam as duas.
+            return biblioteca.map(l => {
+                const campos = [
                     escaparTSV(l.titulo),
                     escaparTSV(obterAutores(l).join(SEP_AUTORES + " ")),
                     escaparTSV(obterTemas(l).join(SEP_AUTORES + " ")),
@@ -1741,8 +1747,10 @@
                     escaparTSV(l.comentarios || ""),
                     escaparTSV(l.local || ""),
                     (Array.isArray(l.grupoLiteratura) && l.grupoLiteratura.length > 0) ? l.grupoLiteratura.join(";") : "0"
-                ].join("\t")
-            ).join("\n") + "\n";
+                ];
+                if ((l.pais || "").trim()) campos.push(escaparTSV(l.pais.trim()));
+                return campos.join("\t");
+            }).join("\n") + "\n";
         }
 
         function parseTSV(texto) {
@@ -1751,8 +1759,15 @@
             for (const linha of linhas) {
                 if (!linha.trim()) continue;
                 const campos = linha.split("\t");
-                // 5 colunas (legado), 6, 7 ou 8 (com grupoLiteratura).
-                if (campos.length < 5 || campos.length > 8) continue;
+                // 5 colunas (legado), 6, 7, 8 (com grupoLiteratura) ou 9 (com pais).
+                //
+                // O LIMITE SUPERIOR E PERIGOSO: ate a 1.9.13 ele era 8, e uma
+                // linha com 9 campos era descartada EM SILENCIO. Como o Mac
+                // salva sozinho, bastava um arquivo com a coluna nova para a
+                // biblioteca abrir vazia e o vazio ser gravado por cima. Por
+                // isso esta versao so APRENDE a ler e preservar; o dado so entra
+                // depois que ela estiver instalada nas quatro maquinas.
+                if (campos.length < 5 || campos.length > 9) continue;
                 const ano = parseInt(campos[3], 10);
                 if (Number.isNaN(ano)) continue;
                 const autores = campos[1].split(SEP_AUTORES).map(a => a.trim()).filter(a => a.length > 0);
@@ -1765,7 +1780,11 @@
                     emprestado: campos[4].trim() === "1",
                     comentarios: campos.length >= 6 ? campos[5] : "",
                     local: campos.length >= 7 ? campos[6] : "",
-                    grupoLiteratura: campos.length >= 8 ? parseGruposStr(campos[7]) : []
+                    grupoLiteratura: campos.length >= 8 ? parseGruposStr(campos[7]) : [],
+                    // Codigo ISO de 2 letras, em maiusculas. Vazio = nao sabemos.
+                    // Guardar mesmo sem usar: o que o programa nao entende, ele
+                    // devolve intacto, em vez de apagar.
+                    pais: campos.length >= 9 ? (campos[8] || "").trim().toUpperCase() : ""
                 });
             }
             return importados.map(normalizarLivro);
