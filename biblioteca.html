@@ -1476,8 +1476,12 @@
         }
         // Sem ponte nativa (navegador comum): nada a esperar.
         window.addEventListener("DOMContentLoaded", () => {
-            const temPonte = !!(window.__TAURI__ ||
-                (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.salvar));
+            // `__BIBLIOTECA_NATIVE__` e a bandeira que o app do Mac injeta — a
+            // MESMA que o resto da pagina usa. A primeira versao disto procurava
+            // `messageHandlers.salvar`, um handler que NAO existe (o Swift
+            // registra `salvarArquivo`): dava falso no Mac e o aviso se escondia
+            // no carregamento. Achado pelo bin/conferir-ponte.py.
+            const temPonte = !!(window.__TAURI__ || window.__BIBLIOTECA_NATIVE__);
             if (!temPonte) requestAnimationFrame(() => requestAnimationFrame(esconderCarregando));
             else mostrarCarregando();
         });

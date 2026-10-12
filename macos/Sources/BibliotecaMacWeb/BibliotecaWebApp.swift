@@ -71,6 +71,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
+        // Sem isto, `confirm()` devolve FALSE na hora e `alert()` nao aparece —
+        // sem erro, sem diálogo, sem pista. Era por isso que o botao Remover da
+        // lista nao fazia nada no Mac: ele pergunta antes de apagar, a resposta
+        // vinha falsa, e o `if` nunca entrava. Medido em 12/10/2026.
+        webView.uiDelegate = self
 
         janela = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
@@ -681,6 +686,61 @@ extension AppDelegate: WKNavigationDelegate {
             decisionHandler(.cancel); return
         }
         decisionHandler(.allow)
+    }
+}
+
+// MARK: - WKUIDelegate — os diálogos do JavaScript
+//
+// O WKWebView NAO tem diálogo nenhum por conta própria. `alert()`, `confirm()`
+// e `prompt()` so existem se o app os desenhar; sem este delegate, `alert` e
+// ignorado e `confirm` devolve FALSE imediatamente. Nada falha, nada avisa — a
+// pagina simplesmente age como se o usuario tivesse dito "nao".
+//
+// Esta e a QUARTA vez que a mesma classe de defeito aparece neste app: antes
+// foram `target="_blank"`, `window.print()` e `window.open`. Por isso existe
+// agora o `bin/conferir-ponte.py`, que compara o que a pagina usa com o que
+// cada hospedeiro implementa.
+
+extension AppDelegate: WKUIDelegate {
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping () -> Void) {
+        let a = NSAlert()
+        a.messageText = message
+        a.addButton(withTitle: "OK")
+        a.beginSheetModal(for: janela) { _ in completionHandler() }
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (Bool) -> Void) {
+        let a = NSAlert()
+        a.messageText = message
+        a.addButton(withTitle: "OK")
+        a.addButton(withTitle: "Cancelar")
+        a.beginSheetModal(for: janela) { resposta in
+            completionHandler(resposta == .alertFirstButtonReturn)
+        }
+    }
+
+    func webView(_ webView: WKWebView,
+                 runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        let a = NSAlert()
+        a.messageText = prompt
+        a.addButton(withTitle: "OK")
+        a.addButton(withTitle: "Cancelar")
+        let campo = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        campo.stringValue = defaultText ?? ""
+        a.accessoryView = campo
+        a.beginSheetModal(for: janela) { resposta in
+            completionHandler(resposta == .alertFirstButtonReturn ? campo.stringValue : nil)
+        }
     }
 }
 
