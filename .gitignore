@@ -24,3 +24,8 @@ tauri/src-tauri/target/
 
 # Pacotes prontos
 dist/
+
+# dependencias dos testes: baixadas com npm install, nao versionadas
+testes/node_modules/
+testes/test-results/
+testes/playwright-report/
