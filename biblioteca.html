@@ -3033,7 +3033,19 @@
         for (const [entrar, sair] of [["mouseover", "mouseout"], ["focusin", "focusout"]]) {
             document.getElementById("mapa-svg").addEventListener(entrar, (e) => {
                 const ponto = e.target.closest(".ponto");
-                if (ponto) ponto.classList.add("destacado");
+                if (!ponto) return;
+                ponto.classList.add("destacado");
+                // EM SVG NAO EXISTE z-index: o que vale e a ordem no documento.
+                // A bolha ampliada ficava POR BAIXO das vizinhas desenhadas
+                // depois dela, e em regiao cheia — Europa, Oriente Medio — mal
+                // dava para ve-la inteira. Reanexar o grupo no fim o poe na
+                // frente. Relatado pelo usuario olhando a tela.
+                //
+                // So reanexa se ja NAO estiver na frente: mover o no dispara
+                // mouseout e mouseover de novo, e sem esta guarda o destaque
+                // entra em laco e o clique na bolha fica instavel. Peguei isso
+                // no teste, nao na tela.
+                if (ponto.nextElementSibling) ponto.parentNode.appendChild(ponto);
             });
             document.getElementById("mapa-svg").addEventListener(sair, (e) => {
                 const ponto = e.target.closest(".ponto");
@@ -3052,7 +3064,10 @@
             const item = e.target.closest("[data-pais]");
             if (!item) return;
             const bolha = document.querySelector(`#mapa-svg circle[data-pais="${item.dataset.pais}"]`);
-            if (bolha) bolha.closest(".ponto").classList.add("destacado");
+            if (!bolha) return;
+            const ponto = bolha.closest(".ponto");
+            ponto.classList.add("destacado");
+            if (ponto.nextElementSibling) ponto.parentNode.appendChild(ponto);  // idem
         });
         document.getElementById("mapa-lista").addEventListener("mouseout", (e) => {
             const item = e.target.closest("[data-pais]");

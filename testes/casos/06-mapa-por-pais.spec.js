@@ -115,6 +115,31 @@ test.describe("Mapa por pais", () => {
     expect(depois.texto).toContain("Japao");
   });
 
+  // Em SVG nao ha z-index: vale a ordem no documento. Sem trazer para a frente,
+  // a bolha ampliada some por baixo das vizinhas em regiao cheia — foi o que o
+  // usuario viu na Europa.
+  test("a bolha destacada vai para a FRENTE das vizinhas", async ({ page }) => {
+    // As bolhas sao desenhadas da maior para a menor, para que uma grande nunca
+    // tape uma pequena. Entao, para provar que o destaque traz para a frente, o
+    // alvo precisa estar NO MEIO — se for o ultimo, ja estaria na frente.
+    await abrirComMapa(page, [
+      livro("B1", { pais: "BR" }), livro("B2", { pais: "BR" }), livro("B3", { pais: "BR" }),
+      livro("J1", { pais: "JP" }), livro("J2", { pais: "JP" }),
+      livro("P1", { pais: "PT" }),
+    ]);
+    const posicaoDoJP = async () => page.evaluate(() => {
+      const g = document.querySelector('#mapa-svg circle[data-pais="JP"]').closest(".ponto");
+      return [...g.parentNode.querySelectorAll(".ponto")].indexOf(g);
+    });
+    const antes = await posicaoDoJP();
+    await page.evaluate(() => document.querySelector('#mapa-svg circle[data-pais="JP"]')
+      .dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+    const depois = await posicaoDoJP();
+    const total = await page.locator("#mapa-svg .ponto").count();
+    expect(antes).toBeLessThan(total - 1);   // nao era o ultimo
+    expect(depois).toBe(total - 1);          // agora e
+  });
+
   test("passar o mouse no nome da lista acende a bolha no mapa", async ({ page }) => {
     await abrirComMapa(page);
     await page.hover('#mapa-lista [data-pais="JP"]');
