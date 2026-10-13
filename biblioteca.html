@@ -793,6 +793,50 @@
         #carregando .titulo { font-size: 17px; font-weight: 600; color: #1f2937; }
         #carregando .detalhe { font-size: 13px; color: var(--muted); max-width: 32em; line-height: 1.5; }
         @media (prefers-reduced-motion: reduce) { #carregando .giro { animation: none; } }
+
+        /* ===================================================================
+           MAPA POR PAIS
+           Projecao equirretangular simples: x = (lon+180)/360, y = (90-lat)/180.
+           Nao ha contorno de continente desenhado — seria dado geografico que
+           eu teria de inventar ou importar. O que ha e verdadeiro: a posicao de
+           cada bolha e a latitude e a longitude do pais, sobre uma grade com o
+           Equador e o meridiano de Greenwich marcados, e o nome do continente
+           ao fundo. Le-se como mapa e nao afirma nenhuma fronteira que eu nao
+           saiba desenhar.
+           =================================================================== */
+        #mapa-svg { width: 100%; height: auto; display: block; background: #eef3fa;
+                    border-radius: 10px; border: 1px solid var(--border); }
+        #mapa-svg .grade      { stroke: #d6e0ee; stroke-width: 0.5; }
+        #mapa-svg .eixo       { stroke: #c3d2e6; stroke-width: 0.9; }
+        #mapa-svg .continente { fill: #b9c7da; font-size: 7px; font-weight: 700;
+                                letter-spacing: 1.4px; text-anchor: middle; user-select: none; }
+        #mapa-svg .bolha      { fill: var(--primary); fill-opacity: .72; stroke: #fff;
+                                stroke-width: 1; cursor: pointer; transition: fill-opacity .12s; }
+        #mapa-svg .bolha:hover{ fill-opacity: 1; }
+        #mapa-svg .bolha.ativa{ fill: var(--accent); fill-opacity: 1; }
+        #mapa-svg .rotulo     { fill: #fff; font-size: 5.5px; font-weight: 700;
+                                text-anchor: middle; pointer-events: none; user-select: none; }
+        #mapa-svg .rotulo-fora{ fill: #4b5563; font-size: 5.5px; font-weight: 600;
+                                text-anchor: middle; pointer-events: none; user-select: none; }
+        .mapa-rodape { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+                       margin-top: 10px; font-size: 13px; color: var(--muted); }
+        .mapa-chip   { display: inline-flex; align-items: center; gap: 6px; background: #e8f3ee;
+                       color: #166b48; border: 1px solid #bfe0d0; border-radius: 999px;
+                       padding: 3px 10px; font-size: 13px; font-weight: 600; }
+        .mapa-chip button { background: none; border: none; color: #166b48; cursor: pointer;
+                            font-size: 15px; line-height: 1; padding: 0 0 0 2px; }
+        .mapa-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+                      gap: 2px 18px; margin-top: 14px; }
+        .pais-item  { display: grid; grid-template-columns: 1fr 64px 2.4em; align-items: center;
+                      gap: 8px; background: none; border: none; border-radius: 6px; cursor: pointer;
+                      padding: 4px 6px; font: inherit; font-size: 13px; color: #1f2937; text-align: left; }
+        .pais-item:hover { background: #eef3fa; }
+        .pais-item.ativo { background: #e8f3ee; color: #166b48; font-weight: 600; }
+        .pais-nome  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pais-barra { height: 6px; background: #e2e8f2; border-radius: 3px; overflow: hidden; }
+        .pais-barra span { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
+        .pais-item.ativo .pais-barra span { background: var(--accent); }
+        .pais-n     { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
     </style>
 </head>
 <body>
@@ -969,6 +1013,22 @@
                         <div class="chips chips-scroll" id="lista-autores"></div>
                     </div>
                 </div>
+            </details>
+        </section>
+
+        <section class="card no-print">
+            <details class="retratil" id="secao-mapa">
+                <summary>
+                    <span>Mapa por pais</span>
+                    <span class="indicador">&#9662;</span>
+                </summary>
+                <p style="margin:12px 0; color: var(--muted); font-size: 13px;">
+                    Cada bolha e um pais, no lugar dele no mundo, e o tamanho e quantos
+                    livros voce tem de la. Clique numa bolha para filtrar a lista.
+                </p>
+                <svg id="mapa-svg" viewBox="0 0 360 190" role="img" aria-label="Mapa do acervo por pais"></svg>
+                <div class="mapa-rodape" id="mapa-rodape"></div>
+                <div id="mapa-lista" class="mapa-lista"></div>
             </details>
         </section>
 
@@ -2582,6 +2642,9 @@
                         if (!Array.isArray(livro.grupoLiteratura) || !livro.grupoLiteratura.includes(id)) return false;
                     }
                     if (filtroComFoto && !fotos[livro.id]) return false;
+                    // O mapa filtra pelo mesmo caminho dos demais filtros: um
+                    // segundo caminho divergiria do primeiro na primeira mudanca.
+                    if (_filtroPais && (livro.pais || "").trim().toUpperCase() !== _filtroPais) return false;
                     return true;
                 });
         }
@@ -2763,6 +2826,192 @@
                 : autoresFilt.map(a => `<span class="chip chip-autor" data-tipo="autor" data-valor="${escapeHtml(a.rotulo)}">${escapeHtml(a.rotulo)}<span class="contagem">${a.total}</span></span>`).join("");
         }
 
+
+        // =====================================================================
+        // MAPA POR PAIS
+        // =====================================================================
+        // A coluna 9 guarda o codigo ISO; aqui ele vira posicao, nome e bolha.
+        //
+        // POSICAO = latitude e longitude APROXIMADAS do centro do pais. Nao e
+        // fronteira, e um ponto — e por isso o mapa nao desenha contorno nenhum:
+        // contorno eu teria de importar ou inventar, e inventar geografia seria
+        // mentir com desenho bonito. A grade, o Equador e o meridiano sao
+        // verdadeiros, e sobre eles a posicao de cada bolha e real.
+        const PAISES = {
+            BR: ["Brasil",          -10,  -55, "AMERICA DO SUL"],
+            AR: ["Argentina",       -34,  -64, "AMERICA DO SUL"],
+            CL: ["Chile",           -35,  -71, "AMERICA DO SUL"],
+            CO: ["Colombia",          4,  -73, "AMERICA DO SUL"],
+            PE: ["Peru",            -10,  -76, "AMERICA DO SUL"],
+            UY: ["Uruguai",         -33,  -56, "AMERICA DO SUL"],
+            US: ["Estados Unidos",   39,  -98, "AMERICA DO NORTE"],
+            CA: ["Canada",           56, -106, "AMERICA DO NORTE"],
+            MX: ["Mexico",           23, -102, "AMERICA DO NORTE"],
+            CU: ["Cuba",             21,  -79, "AMERICA DO NORTE"],
+            PT: ["Portugal",       39.5,   -8, "EUROPA"],
+            ES: ["Espanha",          40, -3.5, "EUROPA"],
+            FR: ["Franca",           46,    2, "EUROPA"],
+            GB: ["Reino Unido",      54,   -2, "EUROPA"],
+            IE: ["Irlanda",          53,   -8, "EUROPA"],
+            DE: ["Alemanha",         51,   10, "EUROPA"],
+            IT: ["Italia",         42.8, 12.5, "EUROPA"],
+            CH: ["Suica",            47,    8, "EUROPA"],
+            AT: ["Austria",        47.6, 14.5, "EUROPA"],
+            BE: ["Belgica",        50.5,  4.5, "EUROPA"],
+            NL: ["Holanda",          52,  5.5, "EUROPA"],
+            DK: ["Dinamarca",        56,   10, "EUROPA"],
+            SE: ["Suecia",           62,   16, "EUROPA"],
+            NO: ["Noruega",          64,   11, "EUROPA"],
+            PL: ["Polonia",          52,   19, "EUROPA"],
+            CZ: ["Tchequia",       49.8,   15, "EUROPA"],
+            HU: ["Hungria",          47, 19.5, "EUROPA"],
+            GR: ["Grecia",           39,   22, "EUROPA"],
+            BY: ["Bielorrussia",   53.7, 27.9, "EUROPA"],
+            RU: ["Russia",           60,   60, "EUROPA"],
+            TR: ["Turquia",          39,   35, "ASIA"],
+            IL: ["Israel",         31.5, 34.8, "ASIA"],
+            PS: ["Palestina",      31.9, 35.2, "ASIA"],
+            LB: ["Libano",         33.9, 35.5, "ASIA"],
+            IR: ["Ira",              32,   53, "ASIA"],
+            IN: ["India",            22,   79, "ASIA"],
+            CN: ["China",            35,  104, "ASIA"],
+            KR: ["Coreia do Sul",  36.5,  128, "ASIA"],
+            JP: ["Japao",            36,  138, "ASIA"],
+            EG: ["Egito",            27,   30, "AFRICA"],
+            SN: ["Senegal",          14,  -14, "AFRICA"],
+            NG: ["Nigeria",           9,    8, "AFRICA"],
+            AO: ["Angola",          -12,   18, "AFRICA"],
+            RW: ["Ruanda",           -2,   30, "AFRICA"],
+            MZ: ["Mocambique",      -18,   35, "AFRICA"],
+            ZA: ["Africa do Sul",   -29,   24, "AFRICA"],
+            AU: ["Australia",       -25,  134, "OCEANIA"],
+        };
+
+        const CONTINENTES_NO_MAPA = [
+            ["AMERICA DO NORTE",  45, -100], ["AMERICA DO SUL", -20, -60],
+            ["EUROPA",            58,   20], ["AFRICA",           2,   20],
+            ["ASIA",              48,   95], ["OCEANIA",        -28,  140],
+        ];
+
+        let _filtroPais = "";
+
+        function nomeDoPais(iso) {
+            return (PAISES[iso] && PAISES[iso][0]) || iso;
+        }
+
+        function contarPorPais() {
+            const c = {};
+            for (const l of biblioteca) {
+                const iso = (l.pais || "").trim().toUpperCase();
+                if (iso) c[iso] = (c[iso] || 0) + 1;
+            }
+            return c;
+        }
+
+        function projetar(lat, lon) {
+            return [(lon + 180) / 360 * 360, (90 - lat) / 180 * 180 + 5];
+        }
+
+        function renderizarMapa() {
+            const svg = document.getElementById("mapa-svg");
+            if (!svg) return;
+            const contagem = contarPorPais();
+            const total = Object.values(contagem).reduce((a, b) => a + b, 0);
+            const maior = Math.max(1, ...Object.values(contagem));
+
+            const partes = [];
+            for (let lon = -180; lon <= 180; lon += 30) {
+                const x = (lon + 180) / 360 * 360;
+                partes.push(`<line class="${lon === 0 ? "eixo" : "grade"}" x1="${x}" y1="5" x2="${x}" y2="185"/>`);
+            }
+            for (let lat = -90; lat <= 90; lat += 30) {
+                const y = (90 - lat) / 180 * 180 + 5;
+                partes.push(`<line class="${lat === 0 ? "eixo" : "grade"}" x1="0" y1="${y}" x2="360" y2="${y}"/>`);
+            }
+            for (const [nome, lat, lon] of CONTINENTES_NO_MAPA) {
+                const [x, y] = projetar(lat, lon);
+                partes.push(`<text class="continente" x="${x}" y="${y}">${nome}</text>`);
+            }
+
+            // Os maiores primeiro, para que uma bolha grande nunca tape uma pequena.
+            const ordenados = Object.entries(contagem)
+                .filter(([iso]) => PAISES[iso])
+                .sort((a, b) => b[1] - a[1]);
+            const semPosicao = Object.keys(contagem).filter(iso => !PAISES[iso]);
+
+            for (const [iso, n] of ordenados) {
+                const [, lat, lon] = PAISES[iso];
+                const [x, y] = projetar(lat, lon);
+                const r = 2.2 + 9 * Math.sqrt(n / maior);
+                const ativa = _filtroPais === iso ? " ativa" : "";
+                partes.push(
+                    `<g><title>${escapeHtml(nomeDoPais(iso))}: ${n} livro(s)</title>` +
+                    `<circle class="bolha${ativa}" data-pais="${iso}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/>` +
+                    // So rotula quando o nome cabe DENTRO da bolha. Rotular por
+                    // fora empilhava siglas na Europa e na America do Sul —
+                    // "CLARUY" era Chile, Argentina e Uruguai sobrepostos. Quem
+                    // da o nome de cada bolha pequena e a lista abaixo e o
+                    // tooltip; o mapa fica com a forma, que e o que ele faz bem.
+                    (r >= 5 ? `<text class="rotulo" x="${x.toFixed(1)}" y="${(y + 1.9).toFixed(1)}">${iso}</text>` : "") +
+                    `</g>`);
+            }
+            svg.innerHTML = partes.join("");
+
+            // A LISTA. O mapa mostra a forma do acervo; ele nao consegue
+            // mostrar 38 nomes num punhado de pixels. A lista faz isso, ordenada
+            // pelo tamanho, e e tambem o desenho que vai para os celulares, onde
+            // mapa clicavel com 38 paises num polegar nao funciona.
+            const lista = document.getElementById("mapa-lista");
+            if (lista) {
+                lista.innerHTML = ordenados.map(([iso, n]) => {
+                    const largura = Math.max(3, Math.round(n / maior * 100));
+                    const ativa = _filtroPais === iso ? " ativo" : "";
+                    return `<button type="button" class="pais-item${ativa}" data-pais="${iso}">` +
+                           `<span class="pais-nome">${escapeHtml(nomeDoPais(iso))}</span>` +
+                           `<span class="pais-barra"><span style="width:${largura}%"></span></span>` +
+                           `<span class="pais-n">${n}</span></button>`;
+                }).join("");
+            }
+
+            const semPais = biblioteca.length - total;
+            const rodape = document.getElementById("mapa-rodape");
+            rodape.innerHTML =
+                (_filtroPais
+                    ? `<span class="mapa-chip">${escapeHtml(nomeDoPais(_filtroPais))}` +
+                      `<button type="button" id="mapa-limpar" title="Mostrar todos">&#10005;</button></span>`
+                    : "") +
+                `<span>${total} livro(s) com pais em ${ordenados.length} pais(es) &middot; ` +
+                `${semPais} ainda sem pais</span>` +
+                (semPosicao.length
+                    ? `<span style="color:#b45309">sem posicao no mapa: ${semPosicao.join(", ")}</span>`
+                    : "");
+
+            const limpar = document.getElementById("mapa-limpar");
+            if (limpar) limpar.addEventListener("click", () => { _filtroPais = ""; executarPesquisa(); renderizarMapa(); });
+        }
+
+        function escolherPais(iso) {
+            _filtroPais = (_filtroPais === iso) ? "" : iso;   // clicar de novo desfaz
+            executarPesquisa();
+            // `executarPesquisa` redesenha a TABELA, nao o mapa. Sem esta linha o
+            // filtro funcionava e nada na tela dizia qual pais estava ativo: nem
+            // a bolha destacada, nem o chip para desfazer.
+            renderizarMapa();
+            document.getElementById("secao-mapa").scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        document.getElementById("mapa-lista").addEventListener("click", (e) => {
+            const item = e.target.closest("[data-pais]");
+            if (item) escolherPais(item.dataset.pais);
+        });
+
+        document.getElementById("mapa-svg").addEventListener("click", (e) => {
+            const bolha = e.target.closest("[data-pais]");
+            if (!bolha) return;
+            const iso = bolha.dataset.pais;
+            escolherPais(iso);
+        });
+
         function renderizarSeletorEdicao() {
             const filtro = normalizar(document.getElementById("edit-busca").value);
             const seletor = document.getElementById("edit-seletor");
@@ -2927,6 +3176,7 @@
             renderizar();
             renderizarCategorias();
             renderizarSeletorEdicao();
+            renderizarMapa();
             atualizarDataLists();
             atualizarBotaoFotosOrfas();
         }
