@@ -601,6 +601,14 @@
             color: #166b48;
         }
 
+        /* A pasta configurada sumiu e o programa esta lendo de outra. Nao e
+           erro — ele funciona —, mas pode ser OUTRA biblioteca, e isso o
+           usuario precisa ver antes de editar qualquer coisa. */
+        .sync-banner.sync-aviso {
+            background: #fef3c7;
+            border-color: #f6d98a;
+            color: #92400e;
+        }
         .sync-banner.sync-pendente {
             background: #fff7e0;
             border-color: #f3e1a8;
@@ -2214,10 +2222,41 @@
                 const msg = document.getElementById("sync-mensagem");
                 if (banner) { banner.className = "sync-banner sync-ok"; }
                 if (msg) {
-                    window.__TAURI__.core.invoke("obter_caminho_arquivo").then(caminho => {
-                        if (msg) msg.textContent = `Arquivo: ${caminho} — alterações salvas automaticamente.`;
+                    // Mostra TAMBEM a data do arquivo, e avisa quando a pasta em
+                    // uso nao e a configurada.
+                    //
+                    // Em 13/10/2026 o Windows mostrou "0 livros com pais" e 749
+                    // livros, com a base real em 750 e 280 paises. Nao havia
+                    // defeito: o iCloud para Windows tinha parado de sincronizar
+                    // e aquele arquivo era de SEIS DIAS antes. A faixa ja dizia o
+                    // caminho — mas caminho nao conta idade, e nuvem que para de
+                    // sincronizar para em silencio.
+                    window.__TAURI__.core.invoke("info_do_arquivo").then(bruto => {
+                        const info = JSON.parse(bruto);
+                        let texto = `Arquivo: ${info.caminho}`;
+                        if (info.modificado) {
+                            const d = new Date(info.modificado);
+                            const dias = Math.floor((Date.now() - d.getTime()) / 86400000);
+                            texto += ` — gravado em ${d.toLocaleString("pt-BR")}`;
+                            if (dias >= 3) texto += ` (ha ${dias} dias)`;
+                        }
+                        texto += " — alterações salvas automaticamente.";
+                        if (msg) msg.textContent = texto;
+                        if (!info.usandoConfigurada && banner) {
+                            banner.className = "sync-banner sync-aviso";
+                            if (msg) {
+                                msg.textContent =
+                                    `ATENÇÃO: a pasta configurada (${info.configurada}) não está ` +
+                                    `acessível. Lendo de ${info.caminho}, que pode ser outra ` +
+                                    `biblioteca. ` + texto;
+                            }
+                        }
                     }).catch(() => {
-                        if (msg) msg.textContent = "Sincronizado — alterações salvas automaticamente.";
+                        window.__TAURI__.core.invoke("obter_caminho_arquivo").then(caminho => {
+                            if (msg) msg.textContent = `Arquivo: ${caminho} — alterações salvas automaticamente.`;
+                        }).catch(() => {
+                            if (msg) msg.textContent = "Sincronizado — alterações salvas automaticamente.";
+                        });
                     });
                 }
                 ["btn-vincular","btn-desvincular"].forEach(id => {

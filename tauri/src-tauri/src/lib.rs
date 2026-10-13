@@ -505,6 +505,41 @@ fn obter_caminho_arquivo() -> String {
     caminho_base().to_string_lossy().to_string()
 }
 
+/// O caminho, a DATA do arquivo e se a pasta em uso e a que foi configurada.
+///
+/// POR QUE A DATA: em 13/10/2026 o aplicativo do Windows mostrou "0 livros com
+/// pais" e 749 livros, quando a base tinha 750 e 280 paises. Nao havia defeito
+/// no programa: o iCloud para Windows havia parado de sincronizar e o arquivo
+/// daquela pasta era de SEIS DIAS antes. A faixa ja mostrava o caminho, mas
+/// caminho nao conta idade — e nuvem que para de sincronizar para em silencio.
+///
+/// POR QUE O AVISO DE PASTA: se ha uma pasta configurada e ela some (a maquina
+/// esta fora da rede, o disco externo nao esta montado), a busca automatica
+/// escolhe outra e o usuario passa a ver OUTRA biblioteca sem ser avisado. Foi
+/// exatamente assim que a copia velha entrou em cena.
+#[tauri::command]
+fn info_do_arquivo() -> String {
+    let caminho = caminho_base();
+    let modificado = fs::metadata(&caminho)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| time::OffsetDateTime::from(t).format(
+            &time::format_description::well_known::Rfc3339).ok())
+        .unwrap_or_default();
+    let configurada = pasta_configurada()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let usando_configurada = configurada.is_empty()
+        || caminho.parent().map(|p| p.to_string_lossy().to_string()) == Some(configurada.clone());
+    serde_json::json!({
+        "caminho": caminho.to_string_lossy(),
+        "modificado": modificado,
+        "configurada": configurada,
+        "usandoConfigurada": usando_configurada,
+    })
+    .to_string()
+}
+
 /// Copia de backup: biblioteca_<sufixo>.txt na mesma pasta.
 #[tauri::command]
 fn fazer_backup(sufixo: String) -> Result<String, String> {
@@ -731,6 +766,7 @@ pub fn run() {
             carregar_fotos,
             salvar_fotos,
             obter_caminho_arquivo,
+            info_do_arquivo,
             fazer_backup,
             fechar_janela,
             diagnosticar,
