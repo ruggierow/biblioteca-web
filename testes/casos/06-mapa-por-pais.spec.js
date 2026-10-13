@@ -70,6 +70,58 @@ test.describe("Mapa por pais", () => {
     expect(await page.locator(".mapa-chip").count()).toBe(0);
   });
 
+  test("o mundo e desenhado por baixo das bolhas", async ({ page }) => {
+    await abrirComMapa(page);
+    // o fundo mais os paises SEM livro ficam com o tom neutro; os COM livro
+    // ganham um tom proprio — aqui, Brasil e Japao.
+    expect(await page.locator("#mapa-svg .terra").count()).toBeGreaterThan(10);
+    expect(await page.locator("#mapa-svg .terra-minha").count()).toBe(2);
+    // e o contorno vem ANTES das bolhas, senao elas ficariam por baixo
+    const ordem = await page.evaluate(() =>
+      [...document.querySelectorAll("#mapa-svg > *")].map((e) => e.tagName.toLowerCase()));
+    expect(ordem.indexOf("g")).toBeGreaterThan(ordem.lastIndexOf("path"));
+  });
+
+  // Pais pequeno com poucos livros virava bolha quase invisivel — e o que nao se
+  // acerta com o ponteiro nao se le. Dai o raio minimo.
+  test("mesmo um pais com UM livro tem bolha que da para acertar", async ({ page }) => {
+    await abrirComMapa(page, [
+      livro("Muitos 1", { pais: "BR" }), livro("Muitos 2", { pais: "BR" }),
+      livro("Muitos 3", { pais: "BR" }), livro("Muitos 4", { pais: "BR" }),
+      livro("Um so", { pais: "PT" }),
+    ]);
+    const r = await page.evaluate(() =>
+      parseFloat(document.querySelector('#mapa-svg circle[data-pais="PT"]').getAttribute("r")));
+    expect(r).toBeGreaterThanOrEqual(2.6);
+  });
+
+  // A lupa nao pode depender so de `:hover`: assim ela nao e testavel, e nao
+  // serve ao teclado nem ao toque.
+  test("a lupa cresce a bolha e revela o nome", async ({ page }) => {
+    await abrirComMapa(page);
+    const antes = await page.evaluate(() => {
+      const c = document.querySelector('#mapa-svg circle[data-pais="JP"]');
+      return getComputedStyle(c.closest(".ponto").querySelector(".rotulo-lupa")).opacity;
+    });
+    expect(antes).toBe("0");
+    const depois = await page.evaluate(() => {
+      const c = document.querySelector('#mapa-svg circle[data-pais="JP"]');
+      c.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      const g = c.closest(".ponto");
+      return { destacado: g.classList.contains("destacado"),
+               texto: g.querySelector(".rotulo-lupa").textContent };
+    });
+    expect(depois.destacado).toBe(true);
+    expect(depois.texto).toContain("Japao");
+  });
+
+  test("passar o mouse no nome da lista acende a bolha no mapa", async ({ page }) => {
+    await abrirComMapa(page);
+    await page.hover('#mapa-lista [data-pais="JP"]');
+    expect(await page.locator('#mapa-svg circle[data-pais="JP"]').evaluate(
+      (c) => c.closest(".ponto").classList.contains("destacado"))).toBe(true);
+  });
+
   test("conta quantos livros ainda estao sem pais", async ({ page }) => {
     await abrirComMapa(page);
     await expect(page.locator("#mapa-rodape")).toContainText("1 ainda sem pais");
