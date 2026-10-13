@@ -112,7 +112,7 @@ test.describe("Mapa por pais", () => {
                texto: g.querySelector(".rotulo-lupa").textContent };
     });
     expect(depois.destacado).toBe(true);
-    expect(depois.texto).toContain("Japao");
+    expect(depois.texto).toContain("Jap\u00e3o");   // a grafia e a dos celulares
   });
 
   // Em SVG nao ha z-index: vale a ordem no documento. Sem trazer para a frente,

@@ -911,6 +911,10 @@
                         <label for="local">Local do exemplar</label>
                         <input type="text" id="local" placeholder="Ex.: Estante 3, sala de estudo">
                     </div>
+                    <div>
+                        <label for="pais">Pais (opcional)</label>
+                        <select id="pais"></select>
+                    </div>
                     <div class="campo-largo">
                         <label for="comentarios">Comentarios (opcional)</label>
                         <textarea id="comentarios" rows="3" placeholder="Anotacoes pessoais, resumo, observacoes..."></textarea>
@@ -1153,6 +1157,10 @@
                     <div>
                         <label for="edit-local">Local do exemplar</label>
                         <input type="text" id="edit-local">
+                    </div>
+                    <div>
+                        <label for="edit-pais">Pais (opcional)</label>
+                        <select id="edit-pais"></select>
                     </div>
                     <div>
                         <label for="edit-comentarios">Comentarios (opcional)</label>
@@ -2903,58 +2911,64 @@
         // A coluna 9 guarda o codigo ISO; aqui ele vira posicao, nome e bolha.
         //
         // POSICAO = latitude e longitude APROXIMADAS do centro do pais. Nao e
-        // fronteira, e um ponto — e por isso o mapa nao desenha contorno nenhum:
-        // contorno eu teria de importar ou inventar, e inventar geografia seria
-        // mentir com desenho bonito. A grade, o Equador e o meridiano sao
-        // verdadeiros, e sobre eles a posicao de cada bolha e real.
+        // fronteira, e um PONTO: o lugar da bolha. O contorno do mundo vem de
+        // outra fonte (Natural Earth, no <script id="contorno-do-mundo">), e as
+        // duas coisas nao se misturam — a bolha nao e desenhada a partir do
+        // contorno, nem o contorno a partir dela.
+        //
+        // A tabela e tambem a LISTA DO SELETOR dos formularios, por
+        // `preencherSeletorDePais`. So da para escolher um pais que o mapa
+        // sabe onde por.
+        //
+        // O 4o campo e o continente, e ele serve ao seletor, nao ao mapa.
         const PAISES = {
             BR: ["Brasil",          -10,  -55, "AMERICA DO SUL"],
             AR: ["Argentina",       -34,  -64, "AMERICA DO SUL"],
             CL: ["Chile",           -35,  -71, "AMERICA DO SUL"],
-            CO: ["Colombia",          4,  -73, "AMERICA DO SUL"],
+            CO: ["Colômbia",          4,  -73, "AMERICA DO SUL"],
             PE: ["Peru",            -10,  -76, "AMERICA DO SUL"],
             UY: ["Uruguai",         -33,  -56, "AMERICA DO SUL"],
             US: ["Estados Unidos",   39,  -98, "AMERICA DO NORTE"],
-            CA: ["Canada",           56, -106, "AMERICA DO NORTE"],
-            MX: ["Mexico",           23, -102, "AMERICA DO NORTE"],
+            CA: ["Canadá",           56, -106, "AMERICA DO NORTE"],
+            MX: ["México",           23, -102, "AMERICA DO NORTE"],
             CU: ["Cuba",             21,  -79, "AMERICA DO NORTE"],
             PT: ["Portugal",       39.5,   -8, "EUROPA"],
             ES: ["Espanha",          40, -3.5, "EUROPA"],
-            FR: ["Franca",           46,    2, "EUROPA"],
+            FR: ["França",           46,    2, "EUROPA"],
             GB: ["Reino Unido",      54,   -2, "EUROPA"],
             IE: ["Irlanda",          53,   -8, "EUROPA"],
             DE: ["Alemanha",         51,   10, "EUROPA"],
-            IT: ["Italia",         42.8, 12.5, "EUROPA"],
-            CH: ["Suica",            47,    8, "EUROPA"],
-            AT: ["Austria",        47.6, 14.5, "EUROPA"],
-            BE: ["Belgica",        50.5,  4.5, "EUROPA"],
+            IT: ["Itália",         42.8, 12.5, "EUROPA"],
+            CH: ["Suíça",            47,    8, "EUROPA"],
+            AT: ["Áustria",        47.6, 14.5, "EUROPA"],
+            BE: ["Bélgica",        50.5,  4.5, "EUROPA"],
             NL: ["Holanda",          52,  5.5, "EUROPA"],
             DK: ["Dinamarca",        56,   10, "EUROPA"],
-            SE: ["Suecia",           62,   16, "EUROPA"],
+            SE: ["Suécia",           62,   16, "EUROPA"],
             NO: ["Noruega",          64,   11, "EUROPA"],
-            PL: ["Polonia",          52,   19, "EUROPA"],
-            CZ: ["Tchequia",       49.8,   15, "EUROPA"],
+            PL: ["Polônia",          52,   19, "EUROPA"],
+            CZ: ["Tchéquia",       49.8,   15, "EUROPA"],
             HU: ["Hungria",          47, 19.5, "EUROPA"],
-            GR: ["Grecia",           39,   22, "EUROPA"],
-            BY: ["Bielorrussia",   53.7, 27.9, "EUROPA"],
-            RU: ["Russia",           60,   60, "EUROPA"],
+            GR: ["Grécia",           39,   22, "EUROPA"],
+            BY: ["Bielorrússia",   53.7, 27.9, "EUROPA"],
+            RU: ["Rússia",           60,   60, "EUROPA"],
             TR: ["Turquia",          39,   35, "ASIA"],
             IL: ["Israel",         31.5, 34.8, "ASIA"],
             PS: ["Palestina",      31.9, 35.2, "ASIA"],
-            LB: ["Libano",         33.9, 35.5, "ASIA"],
-            IR: ["Ira",              32,   53, "ASIA"],
-            IN: ["India",            22,   79, "ASIA"],
+            LB: ["Líbano",         33.9, 35.5, "ASIA"],
+            IR: ["Irã",              32,   53, "ASIA"],
+            IN: ["Índia",            22,   79, "ASIA"],
             CN: ["China",            35,  104, "ASIA"],
             KR: ["Coreia do Sul",  36.5,  128, "ASIA"],
-            JP: ["Japao",            36,  138, "ASIA"],
+            JP: ["Japão",            36,  138, "ASIA"],
             EG: ["Egito",            27,   30, "AFRICA"],
             SN: ["Senegal",          14,  -14, "AFRICA"],
-            NG: ["Nigeria",           9,    8, "AFRICA"],
+            NG: ["Nigéria",           9,    8, "AFRICA"],
             AO: ["Angola",          -12,   18, "AFRICA"],
             RW: ["Ruanda",           -2,   30, "AFRICA"],
-            MZ: ["Mocambique",      -18,   35, "AFRICA"],
-            ZA: ["Africa do Sul",   -29,   24, "AFRICA"],
-            AU: ["Australia",       -25,  134, "OCEANIA"],
+            MZ: ["Moçambique",      -18,   35, "AFRICA"],
+            ZA: ["África do Sul",   -29,   24, "AFRICA"],
+            AU: ["Austrália",       -25,  134, "OCEANIA"],
         };
 
 
@@ -2962,6 +2976,54 @@
 
         function nomeDoPais(iso) {
             return (PAISES[iso] && PAISES[iso][0]) || iso;
+        }
+
+        /// Monta o seletor de pais de um formulario e deixa `iso` escolhido.
+        ///
+        /// O seletor sai da MESMA tabela PAISES que o mapa usa. Nao ha lista
+        /// solta em lugar nenhum: um pais que o mapa sabe desenhar e um pais
+        /// que o formulario oferece, e vice-versa — se as duas listas fossem
+        /// separadas, alguem escolheria um pais que o mapa nao posiciona e a
+        /// bolha sumiria sem erro.
+        ///
+        /// Agrupado por continente porque 47 nomes numa lista chapada e uma
+        /// rolagem cega; dentro do grupo, ordem alfabetica pelo nome mostrado.
+        ///
+        /// A PRIMEIRA opcao e o vazio, e ela existe por dois motivos: livro
+        /// sem pais e o estado normal (470 de 750 em 13/10/2026), e sem ela
+        /// nao haveria como DESFAZER um pais posto por engano.
+        function preencherSeletorDePais(idSelect, iso) {
+            const sel = document.getElementById(idSelect);
+            if (!sel) return;
+            const alvo = (iso || "").trim().toUpperCase();
+            const porContinente = {};
+            for (const codigo in PAISES) {
+                const cont = PAISES[codigo][3] || "OUTROS";
+                (porContinente[cont] = porContinente[cont] || []).push(codigo);
+            }
+            const ordemContinentes = ["AMERICA DO SUL", "AMERICA DO NORTE", "EUROPA",
+                                      "ASIA", "AFRICA", "OCEANIA"];
+            const continentes = Object.keys(porContinente).sort((a, b) => {
+                const ia = ordemContinentes.indexOf(a), ib = ordemContinentes.indexOf(b);
+                return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+            });
+            let html = '<option value="">\u2014 sem pais \u2014</option>';
+            for (const cont of continentes) {
+                const codigos = porContinente[cont].sort(
+                    (a, b) => nomeDoPais(a).localeCompare(nomeDoPais(b), "pt"));
+                html += `<option disabled>\u2500\u2500 ${escapeHtml(cont)}</option>`;
+                for (const codigo of codigos) {
+                    const marca = codigo === alvo ? " selected" : "";
+                    html += `<option value="${codigo}"${marca}>${escapeHtml(nomeDoPais(codigo))}</option>`;
+                }
+            }
+            // Um codigo gravado que NAO esta na tabela nao pode desaparecer do
+            // seletor: abrir e salvar o livro apagaria o pais dele em silencio.
+            if (alvo && !PAISES[alvo]) {
+                html += `<option value="${escapeHtml(alvo)}" selected>${escapeHtml(alvo)} (fora da tabela)</option>`;
+            }
+            sel.innerHTML = html;
+            sel.value = alvo;   // "" cai na primeira opcao, a do sem pais
         }
 
         function contarPorPais() {
@@ -3645,6 +3707,7 @@
         // tenta restaurar o file handle do IndexedDB e ajusta o banner.
 
         atualizarTudo();
+        preencherSeletorDePais("pais", "");
 
         document.getElementById("form-cadastro").addEventListener("submit", (e) => {
             e.preventDefault();
@@ -3654,6 +3717,7 @@
             const ano = parseInt(document.getElementById("ano").value, 10);
             const comentarios = document.getElementById("comentarios").value.trim();
             const local = document.getElementById("local").value.trim();
+            const pais = document.getElementById("pais").value.trim().toUpperCase();
 
             if (!titulo || autores.length === 0 || temas.length === 0 || Number.isNaN(ano)) {
                 toast("Preencha todos os campos (pelo menos um autor e um tema).");
@@ -3679,7 +3743,7 @@
 
             const participa = document.getElementById("grupo-participa").checked;
             const grupoLiteratura = participa ? lerGruposSelecionados("grupo-checkboxes") : [];
-            const livro = { titulo, autores, temas, ano, emprestado: false, comentarios, local, grupoLiteratura };
+            const livro = { titulo, autores, temas, ano, emprestado: false, comentarios, local, grupoLiteratura, pais };
             normalizarLivro(livro);
             if (_fotoPendenteCadastro) {
                 fotos[livro.id] = _fotoPendenteCadastro;
@@ -3690,6 +3754,7 @@
             paginaAtual = Math.ceil(biblioteca.length / LIVROS_POR_PAGINA);
             atualizarTudo();
             e.target.reset();
+            preencherSeletorDePais("pais", "");
             resetarFotoCadastro();
             document.getElementById("grupo-participa").checked = false;
             document.getElementById("grupo-multi").style.display = "none";
@@ -3702,6 +3767,7 @@
 
         document.getElementById("btn-limpar-cadastro").addEventListener("click", () => {
             document.getElementById("form-cadastro").reset();
+            preencherSeletorDePais("pais", "");
             resetarFotoCadastro();
             document.getElementById("grupo-participa").checked = false;
             document.getElementById("grupo-multi").style.display = "none";
@@ -3875,6 +3941,7 @@
             document.getElementById("edit-emprestado").value = livro.emprestado ? "1" : "0";
             document.getElementById("edit-local").value = livro.local || "";
             document.getElementById("edit-comentarios").value = livro.comentarios || "";
+            preencherSeletorDePais("edit-pais", livro.pais || "");
             const gruposSel = Array.isArray(livro.grupoLiteratura) ? livro.grupoLiteratura : [];
             const editParticipa = gruposSel.length > 0;
             document.getElementById("edit-grupo-participa").checked = editParticipa;
@@ -3970,6 +4037,7 @@
             livro.emprestado = document.getElementById("edit-emprestado").value === "1";
             livro.local = document.getElementById("edit-local").value.trim();
             livro.comentarios = document.getElementById("edit-comentarios").value.trim();
+            livro.pais = document.getElementById("edit-pais").value.trim().toUpperCase();
             const editParticipa = document.getElementById("edit-grupo-participa").checked;
             livro.grupoLiteratura = editParticipa ? lerGruposSelecionados("edit-grupo-checkboxes") : [];
             if (_fotoPendenteEdicao) {

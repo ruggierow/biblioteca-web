@@ -65,10 +65,11 @@ async function livrosGravados(page) {
  * e falhou; o erro era meu, não do programa, mas é o tipo de coisa que só
  * aparece quando se exercita a tela de verdade.
  */
-async function cadastrar(page, { titulo, autor = "Autor de Teste", tema = "Teste", ano = "2024", local = "" }) {
+async function cadastrar(page, { titulo, autor = "Autor de Teste", tema = "Teste", ano = "2024", local = "", pais = null }) {
   await page.fill("#titulo", titulo);
   await page.fill("#ano", String(ano));
   if (local) await page.fill("#local", local);
+  if (pais !== null) await page.selectOption("#pais", pais);
   await page.click("button.btn-add-autor[data-target='autores-container']");
   await page.fill("#autores-container .autor-input >> nth=0", autor);
   await page.click("button.btn-add-tema[data-target='temas-container']");
