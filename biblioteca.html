@@ -1101,6 +1101,7 @@
                 <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca">Fotos orfas</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
+                <button type="button" id="btn-kindle" class="btn-ghost" style="display:none;" title="Procurar na biblioteca do Kindle livros que ainda nao estao aqui">&#9662; Atualizar do Kindle</button>
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
                 <button type="button" id="btn-importar-excel" class="btn-ghost">Importar Excel (Grupo Literatura)</button>
                 <button type="button" id="btn-exportar" class="btn-accent">Exportar (avulso)</button>
@@ -1123,6 +1124,18 @@
     </main>
 
     <!-- Modal de edicao -->
+    <div class="modal-backdrop" id="modal-kindle">
+        <div class="modal">
+            <h3>Atualizar do Kindle</h3>
+            <p id="kindle-resumo" style="color:var(--muted);font-size:13px;margin:0 0 10px;"></p>
+            <div id="kindle-lista" style="max-height:46vh;overflow:auto;border:1px solid #d9e2ef;border-radius:6px;"></div>
+            <div class="button-row" style="margin-top:14px;justify-content:flex-end;">
+                <button type="button" id="btn-kindle-cancelar" class="btn-ghost">Cancelar</button>
+                <button type="button" id="btn-kindle-confirmar" class="btn-primary">Acrescentar</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" id="modal-backdrop">
         <div class="modal">
             <h3>Editar livro</h3>
@@ -3242,6 +3255,181 @@
         // sumiria no Mac e no Windows, e o salvamento automatico apagaria.
         // Idempotente: reler o mesmo livro nao duplica, e reler com outro ISBN
         // substitui (a leitura mais recente vence).
+        // =====================================================================
+        // ATUALIZAR DO KINDLE
+        // =====================================================================
+        // Um sentido so: o que existe no Kindle e nao existe aqui vira linha
+        // nova. NUNCA apaga, NUNCA reescreve linha que ja esta na base. Livro
+        // que voce tirou daqui de proposito nao volta sozinho.
+        //
+        // POR QUE SO NO MAC: a biblioteca do Kindle e um banco dentro do
+        // container do aplicativo Kindle. No Windows nao ha Kindle instalado, e
+        // no iPhone e no Android nenhum aplicativo le os dados de outro. O
+        // botao so aparece onde o lado nativo disse que a biblioteca existe —
+        // ver __BIBLIOTECA_KINDLE__. E basta: a linha entra no biblioteca.txt,
+        // e e o ARQUIVO que viaja para os outros tres.
+        //
+        // O QUE E "NOVO": o ASIN nao aparece em nenhum comentario da base. Nao
+        // e o titulo, de proposito. Comprar no Kindle um livro que voce tem em
+        // papel CRIA linha nova — decisao sua, de 09/10/2026: "gostaria de
+        // distinguir a edicao impressa da edicao do Kindle". A janela avisa
+        // quando e esse o caso, para voce conferir que nao e engano.
+
+        const KINDLE_EDICAO = /\s*\((?:[^()]*\b(?:edition|edicao|edição)\b[^()]*)\)\s*$/i;
+
+        function kindleTituloLimpo(t) {
+            return (t || "").replace(KINDLE_EDICAO, "").trim();
+        }
+
+        /// O Kindle grava "Shibli, Adania"; a base usa "Adania Shibli".
+        function kindleAutorNatural(a) {
+            const texto = (a || "").trim();
+            const partes = texto.split(",");
+            if (partes.length === 2) {
+                const sobrenome = partes[0].trim(), nome = partes[1].trim();
+                if (sobrenome && nome && !/\b(jr|filho|neto|ed|org)\b\.?$/i.test(nome)) {
+                    return nome + " " + sobrenome;
+                }
+            }
+            return texto;
+        }
+
+        function kindleComentario(asin) {
+            return `Ler: https://read.amazon.com/?asin=${asin}`
+                 + ` | Kindle: kindle://book?action=open&asin=${asin}`;
+        }
+
+        function kindleAsinsDaBase() {
+            const vistos = new Set();
+            for (const l of biblioteca) {
+                const c = l.comentarios || "";
+                for (const m of c.matchAll(/asin=([A-Za-z0-9]{6,})/g)) vistos.add(m[1].toUpperCase());
+            }
+            return vistos;
+        }
+
+        let _kindleNovos = [];
+
+        function atualizarDoKindle() {
+            if (!window.__BIBLIOTECA_KINDLE__) {
+                toast("A biblioteca do Kindle so pode ser lida no Mac.");
+                return;
+            }
+            mostrarCarregando("Lendo a biblioteca do Kindle...");
+            webkit.messageHandlers.kindleListar.postMessage("");
+        }
+
+        /// Chamada pelo lado nativo com a biblioteca do Kindle inteira.
+        /// Quem decide o que e novo e esta funcao: a base esta aqui.
+        function kindleRecebeLista(r) {
+            esconderCarregando();
+            if (!r || !r.ok) {
+                alert((r && r.erro) || "Nao consegui ler a biblioteca do Kindle.");
+                return;
+            }
+            const jaTem = kindleAsinsDaBase();
+            _kindleNovos = (r.livros || [])
+                .filter(l => l.asin && !jaTem.has(l.asin.toUpperCase()))
+                .map(l => {
+                    const titulo = kindleTituloLimpo(l.titulo);
+                    const autor = kindleAutorNatural(l.autor);
+                    // So para AVISAR. Nao muda o que entra: a edicao Kindle de
+                    // um livro que voce tem em papel e linha nova de qualquer
+                    // forma.
+                    const { exatos, similares } = encontrarDuplicados(titulo, autor ? [autor] : []);
+                    const parecido = (exatos[0] || similares[0] || {}).livro || null;
+                    return { ...l, titulo, autor, parecido };
+                })
+                .sort((a, b) => (b.compra || "").localeCompare(a.compra || ""));
+
+            const resumo = document.getElementById("kindle-resumo");
+            const lista = document.getElementById("kindle-lista");
+            const btn = document.getElementById("btn-kindle-confirmar");
+            const total = (r.livros || []).length;
+
+            if (_kindleNovos.length === 0) {
+                resumo.textContent = `A biblioteca do Kindle tem ${total} livro(s), e todos ja estao aqui. Nada a acrescentar.`;
+                lista.innerHTML = "";
+                btn.style.display = "none";
+            } else {
+                resumo.innerHTML = `<strong>${_kindleNovos.length}</strong> livro(s) do Kindle ainda nao estao na biblioteca `
+                                 + `(de ${total} no Kindle). Eles entram como <em>local: Kindle</em>, sem tema — `
+                                 + `o tema voce preenche depois.`;
+                lista.innerHTML = _kindleNovos.map((l, i) => `
+                    <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid #eef2f7;cursor:pointer;">
+                        <input type="checkbox" class="kindle-item" data-i="${i}" checked style="width:auto;margin-top:3px;">
+                        <span style="flex:1;min-width:0;">
+                            <span style="font-weight:600;">${escapeHtml(l.titulo)}</span>
+                            <span style="color:var(--muted);"> &middot; ${escapeHtml(l.autor || "sem autor")}${l.ano ? " &middot; " + escapeHtml(l.ano) : ""}</span>
+                            ${l.parecido ? `<br><span style="color:#8a6d1f;font-size:12px;">&#9888; voce ja tem "${escapeHtml(l.parecido.titulo)}" em <em>${escapeHtml(l.parecido.local || "sem local")}</em> — esta entra como a edicao Kindle</span>` : ""}
+                        </span>
+                    </label>`).join("");
+                btn.style.display = "";
+            }
+            document.getElementById("modal-kindle").classList.add("active");
+        }
+
+        function fecharKindle() {
+            document.getElementById("modal-kindle").classList.remove("active");
+        }
+
+        function confirmarKindle() {
+            const marcados = [...document.querySelectorAll(".kindle-item:checked")]
+                .map(c => _kindleNovos[parseInt(c.dataset.i, 10)]).filter(Boolean);
+            if (marcados.length === 0) { fecharKindle(); return; }
+
+            const porAsin = {};
+            for (const l of marcados) {
+                const livro = {
+                    titulo: l.titulo,
+                    autores: l.autor ? [l.autor] : [],
+                    temas: [],
+                    // O leitor da pagina DERRUBA linha com ano vazio (parseInt
+                    // -> NaN -> continue). Um livro do Kindle sem data de
+                    // publicacao sumiria na proxima leitura, em silencio.
+                    ano: parseInt(l.ano, 10) || new Date().getFullYear(),
+                    emprestado: false,
+                    comentarios: kindleComentario(l.asin),
+                    local: "Kindle",
+                    grupoLiteratura: [],
+                    pais: "",
+                };
+                normalizarLivro(livro);
+                biblioteca.push(livro);
+                porAsin[l.asin] = livro.id;
+            }
+            salvar();
+            atualizarTudo();
+            fecharKindle();
+            toast(`${marcados.length} livro(s) do Kindle acrescentado(s).`);
+
+            // A capa vem depois e por fora: quem baixa e o lado nativo, porque
+            // o endereco da Amazon nao manda cabecalho de CORS e um fetch daqui
+            // seria recusado pelo navegador.
+            _kindleCapasEsperadas = porAsin;
+            webkit.messageHandlers.kindleCapas.postMessage(JSON.stringify(Object.keys(porAsin)));
+        }
+
+        let _kindleCapasEsperadas = {};
+
+        function kindleRecebeCapas(r) {
+            const capas = (r && r.capas) || {};
+            let gravadas = 0;
+            for (const asin in capas) {
+                const id = _kindleCapasEsperadas[asin];
+                if (!id || fotos[id]) continue;      // nao sobrescreve capa existente
+                fotos[id] = capas[asin];
+                cancelarRemocaoDeFotos([id]);
+                gravadas++;
+            }
+            _kindleCapasEsperadas = {};
+            if (gravadas > 0) {
+                salvar();
+                atualizarTudo();
+                toast(`${gravadas} capa(s) do Kindle gravada(s).`);
+            }
+        }
+
         function comISBN(texto, isbn) {
             const limpo = (isbn || "").replace(/[^0-9Xx]/g, "").toUpperCase();
             if (!limpo) return texto || "";
@@ -4926,6 +5114,19 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 `;
             }, 100);
         }
+
+        // O botao do Kindle so existe onde a biblioteca do Kindle existe: o
+        // lado nativo do Mac poe __BIBLIOTECA_KINDLE__. No Windows e no
+        // navegador ele nem aparece, em vez de aparecer e falhar.
+        if (window.__BIBLIOTECA_KINDLE__) {
+            document.getElementById("btn-kindle").style.display = "";
+        }
+        document.getElementById("btn-kindle").addEventListener("click", atualizarDoKindle);
+        document.getElementById("btn-kindle-cancelar").addEventListener("click", fecharKindle);
+        document.getElementById("btn-kindle-confirmar").addEventListener("click", confirmarKindle);
+        document.getElementById("modal-kindle").addEventListener("click", (e) => {
+            if (e.target.id === "modal-kindle") fecharKindle();
+        });
 
         document.getElementById("btn-encerrar").addEventListener("click", encerrarInterface);
         document.getElementById("btn-encerrar-topo").addEventListener("click", encerrarInterface);

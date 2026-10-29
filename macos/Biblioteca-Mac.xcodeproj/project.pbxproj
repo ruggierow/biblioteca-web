@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C5EA7E4189B10DA40D369C6 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 13888876EF082DF0B6BDFF0E /* AppIcon.icns */; };
 		0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */; };
+		F13A87137E0449B1AF044AD8 /* Kindle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CF3D4E80DB48B787594AFC /* Kindle.swift */; };
 		F1E95BECFEF287E4DEDF55B0 /* biblioteca.html in Resources */ = {isa = PBXBuildFile; fileRef = 57400D1513BF567EE710732A /* biblioteca.html */; };
 /* End PBXBuildFile section */
 
@@ -17,6 +18,7 @@
 		45514A6994E13C15FF7F90F4 /* BibliotecaWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibliotecaWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		57400D1513BF567EE710732A /* biblioteca.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = biblioteca.html; sourceTree = "<group>"; };
 		97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibliotecaWebApp.swift; sourceTree = "<group>"; };
+		F5CF3D4E80DB48B787594AFC /* Kindle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kindle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -33,6 +35,7 @@
 			isa = PBXGroup;
 			children = (
 				97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */,
+				F5CF3D4E80DB48B787594AFC /* Kindle.swift */,
 			);
 			name = BibliotecaMacWeb;
 			path = Sources/BibliotecaMacWeb;
@@ -129,6 +132,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */,
+				F13A87137E0449B1AF044AD8 /* Kindle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

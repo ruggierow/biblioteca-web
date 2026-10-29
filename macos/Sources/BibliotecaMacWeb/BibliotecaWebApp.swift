@@ -53,6 +53,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "salvarArquivo")
         config.userContentController.add(self, name: "copiar")
         config.userContentController.add(self, name: "grupos")
+        config.userContentController.add(self, name: "kindleListar")
+        config.userContentController.add(self, name: "kindleCapas")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
         // executar qualquer script. O caminho aparece no banner de sincronização,
@@ -63,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             source: """
             window.__BIBLIOTECA_NATIVE__ = true;
             window.__BIBLIOTECA_CAMINHO__ = \(caminhoJS);
+            window.__BIBLIOTECA_KINDLE__ = \(Kindle.disponivel ? "true" : "false");
             """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
@@ -623,6 +626,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Utilitário
 
     /// Converte uma String Swift num literal JavaScript seguro (com aspas).
+    // MARK: - Kindle
+
+    /// Devolve a biblioteca do Kindle para a pagina decidir o que e novo.
+    ///
+    /// Quem compara e a PAGINA, nao este lado: a base esta la, ja carregada e
+    /// ja com as regras de duplicata. Mandar o banco inteiro (116 livros, uns
+    /// 20 KB) e mais simples e mais barato que ensinar o Swift a ler TSV.
+    private func responderKindleListar() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var carga: [String: Any]
+            do {
+                let livros = try Kindle.livros()
+                carga = ["ok": true, "livros": livros.map {
+                    ["asin": $0.asin, "titulo": $0.titulo, "autor": $0.autor,
+                     "ano": $0.ano, "compra": $0.compra]
+                }]
+            } catch Kindle.Erro.semKindle {
+                carga = ["ok": false, "erro": "Nao achei a biblioteca do Kindle neste Mac. "
+                                            + "O aplicativo Kindle precisa estar instalado e "
+                                            + "ter sincronizado ao menos uma vez."]
+            } catch {
+                carga = ["ok": false, "erro": "Nao consegui ler a biblioteca do Kindle."]
+            }
+            self?.entregar(carga, para: "kindleRecebeLista")
+        }
+    }
+
+    /// Baixa as capas dos livros que o usuario confirmou.
+    ///
+    /// Quem baixa e este lado, nao a pagina: o endereco da Amazon nao manda
+    /// cabecalho de CORS, entao um `fetch` de dentro do WKWebView seria
+    /// recusado pelo navegador. Aqui nao ha essa barreira.
+    private func responderKindleCapas(_ json: String) {
+        guard let dados = json.data(using: .utf8),
+              let asins = try? JSONSerialization.jsonObject(with: dados) as? [String]
+        else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var capas: [String: String] = [:]
+            for asin in asins.prefix(60) {
+                if let imagem = Kindle.capa(asin: asin) {
+                    capas[asin] = "data:image/jpeg;base64," + imagem.base64EncodedString()
+                }
+            }
+            self?.entregar(["capas": capas], para: "kindleRecebeCapas")
+        }
+    }
+
+    /// Manda um objeto para uma funcao da pagina, sempre na linha principal.
+    private func entregar(_ carga: [String: Any], para funcao: String) {
+        guard let dados = try? JSONSerialization.data(withJSONObject: carga),
+              let json = String(data: dados, encoding: .utf8) else { return }
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript(
+                "if (typeof \(funcao) === 'function') \(funcao)(\(json));") { _, erro in
+                if let erro { print("Erro ao entregar a \(funcao):", erro) }
+            }
+        }
+    }
+
     private static func paraLiteralJS(_ texto: String) -> String {
         if let dados = try? JSONSerialization.data(withJSONObject: [texto]),
            let json = String(data: dados, encoding: .utf8),
@@ -791,6 +853,11 @@ extension AppDelegate: WKScriptMessageHandler {
         case "grupos":
             guard let json = message.body as? String else { return }
             gravarGrupos(json)
+        case "kindleListar":
+            responderKindleListar()
+        case "kindleCapas":
+            guard let json = message.body as? String else { return }
+            responderKindleCapas(json)
         case "recarregar":
             // Equivalente ao ⌘R do menu, acionável pelo botão da própria página —
             // assim o Mac e o Windows têm o mesmo controle no mesmo lugar.
