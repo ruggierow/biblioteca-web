@@ -3353,8 +3353,8 @@
                 btn.style.display = "none";
             } else {
                 resumo.innerHTML = `<strong>${_kindleNovos.length}</strong> livro(s) do Kindle ainda nao estao na biblioteca `
-                                 + `(de ${total} no Kindle). Eles entram como <em>local: Kindle</em>, sem tema — `
-                                 + `o tema voce preenche depois.`;
+                                 + `(de ${total} no Kindle). Eles entram como <em>local: Kindle</em>. `
+                                 + `O que voce ja tem catalogado empresta tema e pais; o resto voce preenche depois.`;
                 lista.innerHTML = _kindleNovos.map((l, i) => `
                     <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid #eef2f7;cursor:pointer;">
                         <input type="checkbox" class="kindle-item" data-i="${i}" checked style="width:auto;margin-top:3px;">
@@ -3383,7 +3383,12 @@
                 const livro = {
                     titulo: l.titulo,
                     autores: l.autor ? [l.autor] : [],
-                    temas: [],
+                    // Tema e pais sao da OBRA, nao da edicao: se a obra ja esta
+                    // catalogada, a edicao Kindle herda os dois. O conciliador
+                    // em Python ja fazia isso; a pagina nao, e as duas copias da
+                    // mesma regra discordavam — em 30/10/2026 o Judas entrou sem
+                    // tema e sem pais, tendo os dois na linha do impresso.
+                    temas: l.parecido ? [...(l.parecido.temas || [])] : [],
                     // O leitor da pagina DERRUBA linha com ano vazio (parseInt
                     // -> NaN -> continue). Um livro do Kindle sem data de
                     // publicacao sumiria na proxima leitura, em silencio.
@@ -3392,7 +3397,7 @@
                     comentarios: kindleComentario(l.asin),
                     local: "Kindle",
                     grupoLiteratura: [],
-                    pais: "",
+                    pais: l.parecido ? (l.parecido.pais || "") : "",
                 };
                 normalizarLivro(livro);
                 biblioteca.push(livro);

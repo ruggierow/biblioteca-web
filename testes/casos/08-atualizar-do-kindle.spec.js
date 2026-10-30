@@ -161,4 +161,35 @@ test.describe("Atualizar do Kindle", () => {
     const guardada = await page.evaluate((id) => fotos[id], id);
     expect(guardada).toBe("data:image/png;base64,JAMUDA");
   });
+
+  // Tema e pais sao da OBRA, nao da edicao. Em 30/10/2026 o "Judas" do Kindle
+  // entrou sem os dois, tendo ambos na linha do impresso: a regra existia no
+  // conciliador em Python e NAO na pagina.
+  test("a edicao Kindle herda tema e pais da obra que voce ja tem", async ({ page }) => {
+    await abrirComKindle(page, [
+      livro("O Nome do Vento", {
+        autores: ["Patrick Rothfuss"], local: "Estante 3",
+        temas: ["Fantasia"], pais: "US",
+      }),
+    ], UM_NOVO);
+    await page.click("#btn-kindle");
+    responderDialogos(page, true);
+    await page.click("#btn-kindle-confirmar");
+
+    const base = await livrosGravados(page);
+    const doKindle = base.find(l => l.local === "Kindle");
+    expect(doKindle.temas).toEqual(["Fantasia"]);
+    expect(doKindle.pais).toBe("US");
+    // E o impresso continua intocado — o sentido e unico.
+    expect(base.find(l => l.local === "Estante 3").temas).toEqual(["Fantasia"]);
+  });
+
+  test("livro que a base NAO tem continua entrando sem tema e sem pais", async ({ page }) => {
+    await abrirComKindle(page, [], UM_NOVO);
+    await page.click("#btn-kindle");
+    await page.click("#btn-kindle-confirmar");
+    const l = (await livrosGravados(page))[0];
+    expect(l.temas).toEqual([]);
+    expect(l.pais || "").toBe("");
+  });
 });
