@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "grupos")
         config.userContentController.add(self, name: "kindleListar")
         config.userContentController.add(self, name: "kindleCapas")
+        config.userContentController.add(self, name: "audibleListar")
 
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
         // executar qualquer script. O caminho aparece no banner de sincronização,
@@ -66,6 +67,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.__BIBLIOTECA_NATIVE__ = true;
             window.__BIBLIOTECA_CAMINHO__ = \(caminhoJS);
             window.__BIBLIOTECA_KINDLE__ = \(Kindle.disponivel ? "true" : "false");
+            window.__BIBLIOTECA_AUDIBLE__ = \(Audible.disponivel ? "true" : "false");
+            window.__BIBLIOTECA_LOJAS_AVISO__ = \(Self.paraLiteralJS(Audible.motivoDaFalta ?? ""));
             """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
@@ -653,6 +656,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Audible
+
+    /// Devolve a biblioteca do Audible para a pagina decidir o que e novo.
+    ///
+    /// Mesmo desenho do Kindle: quem compara e a PAGINA, que e onde a base
+    /// esta. Este lado entrega os tres sinais de direito e nao decide nada.
+    ///
+    /// A mensagem de falta vem do proprio `Audible`, e distingue "nao esta
+    /// instalado" de "esta instalado mas nao entrou na conta" — sao conservas
+    /// diferentes, e dizer so "nao consegui" obrigaria o usuario a adivinhar.
+    private func responderAudibleListar() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var carga: [String: Any]
+            do {
+                let livros = try Audible.livros()
+                carga = ["ok": true, "livros": livros.map {
+                    ["asin": $0.asin, "titulo": $0.titulo, "autores": $0.autores,
+                     "narradores": $0.narradores, "anoAudio": $0.anoAudio,
+                     "naBiblioteca": $0.naBiblioteca, "consumivel": $0.consumivel,
+                     "paraSempre": $0.paraSempre]
+                }]
+            } catch Audible.Erro.semAudible {
+                carga = ["ok": false,
+                         "erro": Audible.motivoDaFalta
+                               ?? "Nao achei a biblioteca do Audible neste Mac."]
+            } catch {
+                carga = ["ok": false, "erro": "Nao consegui ler a biblioteca do Audible."]
+            }
+            self?.entregar(carga, para: "audibleRecebeLista")
+        }
+    }
+
     /// Baixa as capas dos livros que o usuario confirmou.
     ///
     /// Quem baixa e este lado, nao a pagina: o endereco da Amazon nao manda
@@ -858,6 +893,8 @@ extension AppDelegate: WKScriptMessageHandler {
         case "kindleCapas":
             guard let json = message.body as? String else { return }
             responderKindleCapas(json)
+        case "audibleListar":
+            responderAudibleListar()
         case "recarregar":
             // Equivalente ao ⌘R do menu, acionável pelo botão da própria página —
             // assim o Mac e o Windows têm o mesmo controle no mesmo lugar.

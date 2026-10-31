@@ -50,19 +50,19 @@ const UM_NOVO = [{
 test.describe("Atualizar do Kindle", () => {
   test("o botao NAO aparece onde nao ha Kindle", async ({ page }) => {
     await abrir(page, []);          // navegador comum: sem a bandeira nativa
-    await expect(page.locator("#btn-kindle")).toBeHidden();
+    await expect(page.locator("#btn-lojas")).toBeHidden();
   });
 
   test("o botao aparece quando o lado nativo diz que ha Kindle", async ({ page }) => {
     await abrirComKindle(page, [], []);
-    await expect(page.locator("#btn-kindle")).toBeVisible();
+    await expect(page.locator("#btn-lojas")).toBeVisible();
   });
 
   test("livro novo entra com local Kindle, os dois links e o titulo LIMPO", async ({ page }) => {
     await abrirComKindle(page, [], UM_NOVO);
-    await page.click("#btn-kindle");
-    await expect(page.locator("#modal-kindle")).toBeVisible();
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await expect(page.locator("#modal-lojas")).toBeVisible();
+    await page.click("#btn-lojas-confirmar");
 
     const base = await livrosGravados(page);
     expect(base).toHaveLength(1);
@@ -79,9 +79,9 @@ test.describe("Atualizar do Kindle", () => {
     await abrirComKindle(page, [
       livro("O Nome do Vento", { local: "Kindle", comentarios: COMENTARIO("B0NOVO00001") }),
     ], UM_NOVO);
-    await page.click("#btn-kindle");
-    await expect(page.locator("#kindle-resumo")).toContainText("todos ja estao aqui");
-    await expect(page.locator("#btn-kindle-confirmar")).toBeHidden();
+    await page.click("#btn-lojas");
+    await expect(page.locator("#lojas-resumo")).toContainText("todos ja estao aqui");
+    await expect(page.locator("#btn-lojas-confirmar")).toBeHidden();
     expect(await livrosGravados(page)).toHaveLength(1);
   });
 
@@ -89,11 +89,11 @@ test.describe("Atualizar do Kindle", () => {
     await abrirComKindle(page, [
       livro("O Nome do Vento", { autores: ["Patrick Rothfuss"], local: "Estante 3" }),
     ], UM_NOVO);
-    await page.click("#btn-kindle");
+    await page.click("#btn-lojas");
     // O aviso existe para voce conferir que nao e engano...
-    await expect(page.locator("#kindle-lista")).toContainText("Estante 3");
+    await expect(page.locator("#lojas-lista")).toContainText("Estante 3");
     responderDialogos(page, true);
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas-confirmar");
     // ...mas a linha entra: sao duas edicoes da mesma obra.
     const base = await livrosGravados(page);
     expect(base).toHaveLength(2);
@@ -102,9 +102,9 @@ test.describe("Atualizar do Kindle", () => {
 
   test("desmarcar deixa o livro de fora", async ({ page }) => {
     await abrirComKindle(page, [], UM_NOVO);
-    await page.click("#btn-kindle");
-    await page.uncheck(".kindle-item");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.uncheck(".lojas-item");
+    await page.click("#btn-lojas-confirmar");
     expect(await livrosGravados(page)).toHaveLength(0);
   });
 
@@ -116,8 +116,8 @@ test.describe("Atualizar do Kindle", () => {
     ];
     // A biblioteca do Kindle NAO tem "Outro do Kindle" nem o de papel.
     await abrirComKindle(page, antes, UM_NOVO);
-    await page.click("#btn-kindle");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
     const base = await livrosGravados(page);
     expect(base).toHaveLength(3);
     const papel = base.find(l => l.titulo === "Livro de Papel");
@@ -131,8 +131,8 @@ test.describe("Atualizar do Kindle", () => {
   // na proxima leitura, em silencio.
   test("livro do Kindle SEM ano sobrevive a ida e volta pelo arquivo", async ({ page }) => {
     await abrirComKindle(page, [], [{ ...UM_NOVO[0], ano: "" }]);
-    await page.click("#btn-kindle");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
     const devolta = await page.evaluate(() => parseTSV(serializarTSV()));
     expect(devolta).toHaveLength(1);
     expect(Number.isNaN(devolta[0].ano)).toBe(false);
@@ -143,9 +143,9 @@ test.describe("Atualizar do Kindle", () => {
       UM_NOVO[0],
       { asin: "B0NOVO00002", titulo: "Segundo Livro", autor: "Souza, Ana", ano: "2020", compra: "2026-10-27" },
     ]);
-    await page.click("#btn-kindle");
-    await page.uncheck(".kindle-item[data-i='1']");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.uncheck(".lojas-item[data-i='1']");
+    await page.click("#btn-lojas-confirmar");
     const pedido = await page.evaluate(() =>
       window.__PEDIDOS__.filter(p => p.canal === "kindleCapas").pop());
     expect(JSON.parse(pedido.corpo)).toEqual(["B0NOVO00001"]);
@@ -153,8 +153,8 @@ test.describe("Atualizar do Kindle", () => {
 
   test("a capa recebida nao sobrescreve capa que ja existe", async ({ page }) => {
     await abrirComKindle(page, [], UM_NOVO);
-    await page.click("#btn-kindle");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
     const id = (await livrosGravados(page))[0].id;
     await page.evaluate((id) => { fotos[id] = "data:image/png;base64,JAMUDA"; }, id);
     await page.evaluate((id) => window.kindleRecebeCapas({ capas: { B0NOVO00001: "data:image/jpeg;base64,NOVA" } }), id);
@@ -172,9 +172,9 @@ test.describe("Atualizar do Kindle", () => {
         temas: ["Fantasia"], pais: "US",
       }),
     ], UM_NOVO);
-    await page.click("#btn-kindle");
+    await page.click("#btn-lojas");
     responderDialogos(page, true);
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas-confirmar");
 
     const base = await livrosGravados(page);
     const doKindle = base.find(l => l.local === "Kindle");
@@ -186,8 +186,8 @@ test.describe("Atualizar do Kindle", () => {
 
   test("livro que a base NAO tem continua entrando sem tema e sem pais", async ({ page }) => {
     await abrirComKindle(page, [], UM_NOVO);
-    await page.click("#btn-kindle");
-    await page.click("#btn-kindle-confirmar");
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
     const l = (await livrosGravados(page))[0];
     expect(l.temas).toEqual([]);
     expect(l.pais || "").toBe("");

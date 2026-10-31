@@ -15,9 +15,16 @@ import SQLite3
 ///
 ///   - o aplicativo NAO e sandboxed (nao ha com.apple.security.app-sandbox nos
 ///     entitlements), entao enxerga o container do Kindle;
-///   - o container do Kindle NAO e protegido pelo TCC: um processo SEM Acesso
-///     Total ao Disco le o banco. Ou seja, nenhum dialogo de permissao, nada
-///     para o usuario configurar.
+///   - este aplicativo foi AUTORIZADO pelo usuario em Acesso Total ao Disco, e
+///     e por isso que le.
+///
+/// A segunda medida estava ERRADA ate 30/10/2026, e dizia "o container do
+/// Kindle nao e protegido pelo TCC". Ele E protegido: eu medi do meu terminal,
+/// que herda a permissao do processo responsavel, e li a heranca como ausencia
+/// de protecao. A tarefa diaria so passou a ler depois de autorizada E com
+/// executavel compilado — a licao `tcc-autoriza-o-binario-nao-o-pacote`.
+/// Nenhum dialogo de permissao aparece: tem de ser acrescentado a mao em
+/// Ajustes do Sistema. O mesmo vale para o container do Audible.
 ///
 /// NAO USAR o XML do aplicativo classico (com.amazon.Kindle): esta velho e tem
 /// um livro so.

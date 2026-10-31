@@ -1101,7 +1101,7 @@
                 <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca">Fotos orfas</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista">&#8635; Recarregar</button>
-                <button type="button" id="btn-kindle" class="btn-ghost" style="display:none;" title="Procurar na biblioteca do Kindle livros que ainda nao estao aqui">&#9662; Atualizar do Kindle</button>
+                <button type="button" id="btn-lojas" class="btn-ghost" style="display:none;" title="Procurar no Kindle e no Audible livros que ainda nao estao aqui">&#9662; Atualizar do Kindle e do Audible</button>
                 <button type="button" id="btn-importar" class="btn-ghost">Importar (avulso)</button>
                 <button type="button" id="btn-importar-excel" class="btn-ghost">Importar Excel (Grupo Literatura)</button>
                 <button type="button" id="btn-exportar" class="btn-accent">Exportar (avulso)</button>
@@ -1124,14 +1124,15 @@
     </main>
 
     <!-- Modal de edicao -->
-    <div class="modal-backdrop" id="modal-kindle">
+    <div class="modal-backdrop" id="modal-lojas">
         <div class="modal">
-            <h3>Atualizar do Kindle</h3>
-            <p id="kindle-resumo" style="color:var(--muted);font-size:13px;margin:0 0 10px;"></p>
-            <div id="kindle-lista" style="max-height:46vh;overflow:auto;border:1px solid #d9e2ef;border-radius:6px;"></div>
+            <h3>Atualizar do Kindle e do Audible</h3>
+            <p id="lojas-resumo" style="color:var(--muted);font-size:13px;margin:0 0 10px;"></p>
+            <p id="lojas-aviso" style="color:#8a6d1f;font-size:13px;margin:0 0 10px;display:none;"></p>
+            <div id="lojas-lista" style="max-height:46vh;overflow:auto;border:1px solid #d9e2ef;border-radius:6px;"></div>
             <div class="button-row" style="margin-top:14px;justify-content:flex-end;">
-                <button type="button" id="btn-kindle-cancelar" class="btn-ghost">Cancelar</button>
-                <button type="button" id="btn-kindle-confirmar" class="btn-primary">Acrescentar</button>
+                <button type="button" id="btn-lojas-cancelar" class="btn-ghost">Cancelar</button>
+                <button type="button" id="btn-lojas-confirmar" class="btn-primary">Acrescentar</button>
             </div>
         </div>
     </div>
@@ -3256,24 +3257,41 @@
         // Idempotente: reler o mesmo livro nao duplica, e reler com outro ISBN
         // substitui (a leitura mais recente vence).
         // =====================================================================
-        // ATUALIZAR DO KINDLE
+        // ATUALIZAR DAS LOJAS — Kindle e Audible
         // =====================================================================
-        // Um sentido so: o que existe no Kindle e nao existe aqui vira linha
+        // Um sentido so: o que existe na loja e nao existe aqui vira linha
         // nova. NUNCA apaga, NUNCA reescreve linha que ja esta na base. Livro
         // que voce tirou daqui de proposito nao volta sozinho.
         //
-        // POR QUE SO NO MAC: a biblioteca do Kindle e um banco dentro do
-        // container do aplicativo Kindle. No Windows nao ha Kindle instalado, e
-        // no iPhone e no Android nenhum aplicativo le os dados de outro. O
-        // botao so aparece onde o lado nativo disse que a biblioteca existe —
-        // ver __BIBLIOTECA_KINDLE__. E basta: a linha entra no biblioteca.txt,
-        // e e o ARQUIVO que viaja para os outros tres.
+        // UM BOTAO SO para as duas lojas (decisao do usuario, 31/10/2026). Ele
+        // pergunta as que ESTAO disponiveis e espera todas responderem antes de
+        // abrir a janela, para a conferencia ser uma so. A loja que falta nao
+        // some em silencio: a janela diz o que falta e por que.
+        //
+        // POR QUE SO NO MAC: as duas bibliotecas sao bancos dentro do container
+        // do aplicativo. No Windows nao ha Kindle nem Audible instalados, e no
+        // iPhone e no Android nenhum aplicativo le os dados de outro. O botao so
+        // aparece onde o lado nativo disse que a biblioteca existe — ver
+        // __BIBLIOTECA_KINDLE__ e __BIBLIOTECA_AUDIBLE__. E basta: a linha entra
+        // no biblioteca.txt, e e o ARQUIVO que viaja para os outros tres.
         //
         // O QUE E "NOVO": o ASIN nao aparece em nenhum comentario da base. Nao
         // e o titulo, de proposito. Comprar no Kindle um livro que voce tem em
         // papel CRIA linha nova — decisao sua, de 09/10/2026: "gostaria de
-        // distinguir a edicao impressa da edicao do Kindle". A janela avisa
-        // quando e esse o caso, para voce conferir que nao e engano.
+        // distinguir a edicao impressa da edicao do Kindle". O audiolivro segue
+        // a mesma regra, com o mesmo motivo. A janela avisa quando e esse o
+        // caso, para voce conferir que nao e engano.
+
+        const LOJAS = [
+            { id: "kindle",  nome: "Kindle",  bandeira: "__BIBLIOTECA_KINDLE__",  canal: "kindleListar"  },
+            { id: "audible", nome: "Audible", bandeira: "__BIBLIOTECA_AUDIBLE__", canal: "audibleListar" },
+        ];
+
+        function lojasDisponiveis() {
+            return LOJAS.filter(l => window[l.bandeira]);
+        }
+
+        // ---------------------------------------------------------- Kindle
 
         const KINDLE_EDICAO = /\s*\((?:[^()]*\b(?:edition|edicao|edição)\b[^()]*)\)\s*$/i;
 
@@ -3308,111 +3326,255 @@
             return vistos;
         }
 
-        let _kindleNovos = [];
-
-        function atualizarDoKindle() {
-            if (!window.__BIBLIOTECA_KINDLE__) {
-                toast("A biblioteca do Kindle so pode ser lida no Mac.");
-                return;
-            }
-            mostrarCarregando("Lendo a biblioteca do Kindle...");
-            webkit.messageHandlers.kindleListar.postMessage("");
+        /// Do que o lado nativo devolveu para a linha que vai entrar.
+        function kindleParaLinha(l) {
+            const titulo = kindleTituloLimpo(l.titulo);
+            const autor = kindleAutorNatural(l.autor);
+            // So para AVISAR. Nao muda o que entra: a edicao Kindle de um livro
+            // que voce tem em papel e linha nova de qualquer forma.
+            const { exatos, similares } = encontrarDuplicados(titulo, autor ? [autor] : []);
+            const parecido = (exatos[0] || similares[0] || {}).livro || null;
+            return {
+                loja: "Kindle", asin: l.asin, ordem: l.compra || "",
+                titulo, autores: autor ? [autor] : [],
+                // Tema e pais sao da OBRA, nao da edicao: se a obra ja esta
+                // catalogada, a edicao Kindle herda os dois. O conciliador em
+                // Python ja fazia isso; a pagina nao, e as duas copias da mesma
+                // regra discordavam — em 30/10/2026 o Judas entrou sem tema e
+                // sem pais, tendo os dois na linha do impresso.
+                temas: parecido ? [...(parecido.temas || [])] : [],
+                // O leitor da pagina DERRUBA linha com ano vazio (parseInt ->
+                // NaN -> continue). Um livro sem data de publicacao sumiria na
+                // proxima leitura, em silencio.
+                ano: parseInt(l.ano, 10) || new Date().getFullYear(),
+                comentarios: kindleComentario(l.asin),
+                local: "Kindle", grupoLiteratura: [],
+                pais: parecido ? (parecido.pais || "") : "",
+                detalhe: (autor || "sem autor") + (l.ano ? " · " + l.ano : ""),
+                aviso: parecido
+                    ? `voce ja tem "${parecido.titulo}" em ${parecido.local || "sem local"} — esta entra como a edicao Kindle`
+                    : "",
+            };
         }
 
-        /// Chamada pelo lado nativo com a biblioteca do Kindle inteira.
-        /// Quem decide o que e novo e esta funcao: a base esta aqui.
-        function kindleRecebeLista(r) {
-            esconderCarregando();
-            if (!r || !r.ok) {
-                alert((r && r.erro) || "Nao consegui ler a biblioteca do Kindle.");
+        // --------------------------------------------------------- Audible
+
+        const AUDIBLE_LOCAL = "Audio book";
+        const AUDIBLE_A_ADQUIRIR = "A ser adquirido.";
+        const AUDIBLE_MAX_CREDITOS = 3;
+
+        function audibleAteTres(nomes) {
+            const corte = nomes.slice(0, AUDIBLE_MAX_CREDITOS).join(", ");
+            return nomes.length > AUDIBLE_MAX_CREDITOS ? corte + " e outros" : corte;
+        }
+
+        /// A mensagem, os creditos que nao couberam no campo de autor, e o link.
+        ///
+        /// O link e o da WEB de proposito: o esquema `audible://` nao tem rota
+        /// para o titulo — testei tres em 31/10/2026 e as tres abrem a
+        /// BIBLIOTECA, a mesma historia do `kindle://`. E vai SEM a forma de
+        /// consulta, senao `kindleAsinsDaBase()` passaria a tratar ASIN de
+        /// audiolivro como ASIN de Kindle.
+        function audibleComentario(l) {
+            const partes = [];
+            if (!l.paraSempre) partes.push(AUDIBLE_A_ADQUIRIR);
+            const extras = (l.autores || []).slice(1);
+            if (extras.length) partes.push("Outros creditos: " + audibleAteTres(extras));
+            if ((l.narradores || []).length) partes.push("Narrado por " + audibleAteTres(l.narradores));
+            partes.push(`Ouvir: https://www.audible.com.br/pd/${l.asin}`);
+            return partes.join(" | ");
+        }
+
+        function audibleAsinsDaBase() {
+            const vistos = new Set();
+            for (const l of biblioteca) {
+                const c = l.comentarios || "";
+                // O identificador INTEIRO, nao um pedaco: com {10} fixo, um
+                // identificador mais longo casava so nos 10 primeiros, a
+                // comparacao com `l.asin` falhava e o audiolivro ja cadastrado
+                // entrava DE NOVO. Achado pelo caso 09 em 31/10/2026.
+                for (const m of c.matchAll(/audible\.com\.br\/pd\/([A-Za-z0-9]+)/g)) {
+                    vistos.add(m[1].toUpperCase());
+                }
+            }
+            return vistos;
+        }
+
+        /// A linha da base que empresta titulo, autor, tema, grupo e pais.
+        ///
+        /// A IMPRESSA quando existe: e ela que tem tema e pais, e o ano da OBRA.
+        /// A do Kindle so entra quando nao ha outra — e o caso do Brás Cubas,
+        /// que herda o ano da edicao Kindle por nao haver linha da obra.
+        function audibleObraNaBase(titulo) {
+            const alvo = normalizarComparacao(titulo);
+            const casos = biblioteca.filter(l => normalizarComparacao(l.titulo) === alvo);
+            return casos.find(l => l.local !== "Kindle" && l.local !== AUDIBLE_LOCAL)
+                || casos[0] || null;
+        }
+
+        function audibleParaLinha(l) {
+            const obra = audibleObraNaBase(l.titulo);
+            return {
+                loja: "Audible", asin: l.asin, ordem: l.titulo || "",
+                // O titulo e os autores sao os da obra catalogada, inclusive a
+                // acentuacao: o Audible grava "Machado Assis" onde a base tem
+                // "Machado de Assis".
+                titulo: obra ? obra.titulo : (l.titulo || ""),
+                autores: obra ? [...obterAutores(obra)] : (l.autores || []).slice(0, 1),
+                temas: obra ? [...(obra.temas || [])] : [],
+                // O `releaseDate` e o lancamento do AUDIOLIVRO, nao da obra: ha
+                // classicos com 2026. Vale so quando a obra nao esta na base.
+                ano: parseInt((obra && obra.ano) || l.anoAudio, 10) || new Date().getFullYear(),
+                comentarios: audibleComentario(l),
+                local: AUDIBLE_LOCAL,
+                grupoLiteratura: obra ? [...(obra.grupoLiteratura || [])] : [],
+                pais: obra ? (obra.pais || "") : "",
+                detalhe: ((l.autores || [])[0] || "sem autor")
+                       + (l.naBiblioteca ? " · na sua biblioteca" : " · incluso no plano"),
+                aviso: obra
+                    ? `voce ja tem "${obra.titulo}" em ${obra.local || "sem local"} — esta entra como o audiolivro`
+                    : "nao esta na sua biblioteca ainda, entao o ano e o do AUDIOLIVRO — confira",
+            };
+        }
+
+        // --------------------------------------------------- a conversa
+
+        let _lojasPendentes = new Set();
+        let _lojasRespostas = {};
+        let _lojasNovos = [];
+
+        function atualizarDasLojas() {
+            const disponiveis = lojasDisponiveis();
+            if (disponiveis.length === 0) {
+                toast("As bibliotecas do Kindle e do Audible so podem ser lidas no Mac.");
                 return;
             }
-            const jaTem = kindleAsinsDaBase();
-            _kindleNovos = (r.livros || [])
-                .filter(l => l.asin && !jaTem.has(l.asin.toUpperCase()))
-                .map(l => {
-                    const titulo = kindleTituloLimpo(l.titulo);
-                    const autor = kindleAutorNatural(l.autor);
-                    // So para AVISAR. Nao muda o que entra: a edicao Kindle de
-                    // um livro que voce tem em papel e linha nova de qualquer
-                    // forma.
-                    const { exatos, similares } = encontrarDuplicados(titulo, autor ? [autor] : []);
-                    const parecido = (exatos[0] || similares[0] || {}).livro || null;
-                    return { ...l, titulo, autor, parecido };
-                })
-                .sort((a, b) => (b.compra || "").localeCompare(a.compra || ""));
+            _lojasRespostas = {};
+            _lojasPendentes = new Set(disponiveis.map(l => l.id));
+            mostrarCarregando("Lendo " + disponiveis.map(l => l.nome).join(" e ") + "...");
+            for (const l of disponiveis) webkit.messageHandlers[l.canal].postMessage("");
+        }
 
-            const resumo = document.getElementById("kindle-resumo");
-            const lista = document.getElementById("kindle-lista");
-            const btn = document.getElementById("btn-kindle-confirmar");
-            const total = (r.livros || []).length;
+        /// Chamadas pelo lado nativo, uma por loja.
+        function kindleRecebeLista(r)  { lojaRespondeu("kindle", r); }
+        function audibleRecebeLista(r) { lojaRespondeu("audible", r); }
 
-            if (_kindleNovos.length === 0) {
-                resumo.textContent = `A biblioteca do Kindle tem ${total} livro(s), e todos ja estao aqui. Nada a acrescentar.`;
+        /// So monta a janela quando a ULTIMA loja responde. Resposta de loja que
+        /// nao foi perguntada (ou que responde duas vezes) e ignorada, senao uma
+        /// mensagem atrasada reabriria a janela por cima do que o usuario faz.
+        function lojaRespondeu(id, r) {
+            if (!_lojasPendentes.has(id)) return;
+            _lojasRespostas[id] = r || { ok: false, erro: "Nao obtive resposta." };
+            _lojasPendentes.delete(id);
+            if (_lojasPendentes.size === 0) montarJanelaDasLojas();
+        }
+
+        function montarJanelaDasLojas() {
+            esconderCarregando();
+            const jaKindle = kindleAsinsDaBase();
+            const jaAudible = audibleAsinsDaBase();
+            const recados = [];
+            let totalNaLoja = 0;
+            _lojasNovos = [];
+
+            for (const loja of LOJAS) {
+                if (!window[loja.bandeira]) continue;
+                const r = _lojasRespostas[loja.id];
+                if (!r || !r.ok) {
+                    recados.push((r && r.erro) || `Nao consegui ler a biblioteca do ${loja.nome}.`);
+                    continue;
+                }
+                const livros = r.livros || [];
+                totalNaLoja += livros.length;
+                if (loja.id === "kindle") {
+                    _lojasNovos.push(...livros
+                        .filter(l => l.asin && !jaKindle.has(l.asin.toUpperCase()))
+                        .map(kindleParaLinha));
+                } else {
+                    // A regra de entrada do Audible, do usuario (31/10/2026):
+                    // entra o que esta na biblioteca DELE, ou o que ja esta
+                    // catalogado aqui e e gratuito pelo plano. O pago que ele
+                    // nao comprou fica de fora — ele decide se compra.
+                    _lojasNovos.push(...livros
+                        .filter(l => l.asin && !jaAudible.has(l.asin.toUpperCase()))
+                        .filter(l => l.naBiblioteca || (l.consumivel && audibleObraNaBase(l.titulo)))
+                        .map(audibleParaLinha));
+                }
+            }
+            // A loja que o Mac nao tem nao pode sumir calada: o usuario pediria
+            // "atualizar" e receberia meia resposta sem saber.
+            if (window.__BIBLIOTECA_LOJAS_AVISO__) recados.push(window.__BIBLIOTECA_LOJAS_AVISO__);
+
+            _lojasNovos.sort((a, b) => a.loja.localeCompare(b.loja)
+                                    || (b.ordem || "").localeCompare(a.ordem || ""));
+
+            const resumo = document.getElementById("lojas-resumo");
+            const aviso = document.getElementById("lojas-aviso");
+            const lista = document.getElementById("lojas-lista");
+            const btn = document.getElementById("btn-lojas-confirmar");
+
+            aviso.style.display = recados.length ? "" : "none";
+            aviso.innerHTML = recados.map(escapeHtml).join("<br>");
+
+            if (_lojasNovos.length === 0) {
+                resumo.textContent = totalNaLoja
+                    ? `Nada a acrescentar: dos ${totalNaLoja} titulo(s) nas lojas, todos ja estao aqui `
+                      + `ou voce ainda nao os adquiriu.`
+                    : "Nada a acrescentar.";
                 lista.innerHTML = "";
                 btn.style.display = "none";
             } else {
-                resumo.innerHTML = `<strong>${_kindleNovos.length}</strong> livro(s) do Kindle ainda nao estao na biblioteca `
-                                 + `(de ${total} no Kindle). Eles entram como <em>local: Kindle</em>. `
+                resumo.innerHTML = `<strong>${_lojasNovos.length}</strong> titulo(s) ainda nao estao na biblioteca. `
+                                 + `Os do Kindle entram como <em>local: Kindle</em>, os do Audible como `
+                                 + `<em>local: ${escapeHtml(AUDIBLE_LOCAL)}</em>. `
                                  + `O que voce ja tem catalogado empresta tema e pais; o resto voce preenche depois.`;
-                lista.innerHTML = _kindleNovos.map((l, i) => `
+                lista.innerHTML = _lojasNovos.map((l, i) => `
                     <label style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid #eef2f7;cursor:pointer;">
-                        <input type="checkbox" class="kindle-item" data-i="${i}" checked style="width:auto;margin-top:3px;">
+                        <input type="checkbox" class="lojas-item" data-i="${i}" checked style="width:auto;margin-top:3px;">
                         <span style="flex:1;min-width:0;">
-                            <span style="font-weight:600;">${escapeHtml(l.titulo)}</span>
-                            <span style="color:var(--muted);"> &middot; ${escapeHtml(l.autor || "sem autor")}${l.ano ? " &middot; " + escapeHtml(l.ano) : ""}</span>
-                            ${l.parecido ? `<br><span style="color:#8a6d1f;font-size:12px;">&#9888; voce ja tem "${escapeHtml(l.parecido.titulo)}" em <em>${escapeHtml(l.parecido.local || "sem local")}</em> — esta entra como a edicao Kindle</span>` : ""}
+                            <span style="font-size:11px;font-weight:700;color:var(--muted);">${escapeHtml(l.loja.toUpperCase())}</span>
+                            <span style="font-weight:600;"> ${escapeHtml(l.titulo)}</span>
+                            <span style="color:var(--muted);"> &middot; ${escapeHtml(l.detalhe)}</span>
+                            ${l.aviso ? `<br><span style="color:#8a6d1f;font-size:12px;">&#9888; ${escapeHtml(l.aviso)}</span>` : ""}
                         </span>
                     </label>`).join("");
                 btn.style.display = "";
             }
-            document.getElementById("modal-kindle").classList.add("active");
+            document.getElementById("modal-lojas").classList.add("active");
         }
 
-        function fecharKindle() {
-            document.getElementById("modal-kindle").classList.remove("active");
+        function fecharLojas() {
+            document.getElementById("modal-lojas").classList.remove("active");
         }
 
-        function confirmarKindle() {
-            const marcados = [...document.querySelectorAll(".kindle-item:checked")]
-                .map(c => _kindleNovos[parseInt(c.dataset.i, 10)]).filter(Boolean);
-            if (marcados.length === 0) { fecharKindle(); return; }
+        function confirmarLojas() {
+            const marcados = [...document.querySelectorAll(".lojas-item:checked")]
+                .map(c => _lojasNovos[parseInt(c.dataset.i, 10)]).filter(Boolean);
+            if (marcados.length === 0) { fecharLojas(); return; }
 
             const porAsin = {};
             for (const l of marcados) {
                 const livro = {
-                    titulo: l.titulo,
-                    autores: l.autor ? [l.autor] : [],
-                    // Tema e pais sao da OBRA, nao da edicao: se a obra ja esta
-                    // catalogada, a edicao Kindle herda os dois. O conciliador
-                    // em Python ja fazia isso; a pagina nao, e as duas copias da
-                    // mesma regra discordavam — em 30/10/2026 o Judas entrou sem
-                    // tema e sem pais, tendo os dois na linha do impresso.
-                    temas: l.parecido ? [...(l.parecido.temas || [])] : [],
-                    // O leitor da pagina DERRUBA linha com ano vazio (parseInt
-                    // -> NaN -> continue). Um livro do Kindle sem data de
-                    // publicacao sumiria na proxima leitura, em silencio.
-                    ano: parseInt(l.ano, 10) || new Date().getFullYear(),
-                    emprestado: false,
-                    comentarios: kindleComentario(l.asin),
-                    local: "Kindle",
-                    grupoLiteratura: [],
-                    pais: l.parecido ? (l.parecido.pais || "") : "",
+                    titulo: l.titulo, autores: l.autores, temas: l.temas, ano: l.ano,
+                    emprestado: false, comentarios: l.comentarios, local: l.local,
+                    grupoLiteratura: l.grupoLiteratura, pais: l.pais,
                 };
                 normalizarLivro(livro);
                 biblioteca.push(livro);
-                porAsin[l.asin] = livro.id;
+                if (l.loja === "Kindle") porAsin[l.asin] = livro.id;
             }
             salvar();
             atualizarTudo();
-            fecharKindle();
-            toast(`${marcados.length} livro(s) do Kindle acrescentado(s).`);
+            fecharLojas();
+            toast(`${marcados.length} titulo(s) acrescentado(s).`);
 
-            // A capa vem depois e por fora: quem baixa e o lado nativo, porque
-            // o endereco da Amazon nao manda cabecalho de CORS e um fetch daqui
-            // seria recusado pelo navegador.
+            // A capa vem depois e por fora, e so a do Kindle: quem baixa e o
+            // lado nativo, porque o endereco da Amazon nao manda cabecalho de
+            // CORS e um fetch daqui seria recusado pelo navegador.
             _kindleCapasEsperadas = porAsin;
-            webkit.messageHandlers.kindleCapas.postMessage(JSON.stringify(Object.keys(porAsin)));
+            if (Object.keys(porAsin).length) {
+                webkit.messageHandlers.kindleCapas.postMessage(JSON.stringify(Object.keys(porAsin)));
+            }
         }
 
         let _kindleCapasEsperadas = {};
@@ -5120,17 +5282,17 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             }, 100);
         }
 
-        // O botao do Kindle so existe onde a biblioteca do Kindle existe: o
-        // lado nativo do Mac poe __BIBLIOTECA_KINDLE__. No Windows e no
-        // navegador ele nem aparece, em vez de aparecer e falhar.
-        if (window.__BIBLIOTECA_KINDLE__) {
-            document.getElementById("btn-kindle").style.display = "";
+        // O botao so existe onde ALGUMA das duas bibliotecas existe: o lado
+        // nativo do Mac poe __BIBLIOTECA_KINDLE__ e __BIBLIOTECA_AUDIBLE__. No
+        // Windows e no navegador ele nem aparece, em vez de aparecer e falhar.
+        if (lojasDisponiveis().length > 0) {
+            document.getElementById("btn-lojas").style.display = "";
         }
-        document.getElementById("btn-kindle").addEventListener("click", atualizarDoKindle);
-        document.getElementById("btn-kindle-cancelar").addEventListener("click", fecharKindle);
-        document.getElementById("btn-kindle-confirmar").addEventListener("click", confirmarKindle);
-        document.getElementById("modal-kindle").addEventListener("click", (e) => {
-            if (e.target.id === "modal-kindle") fecharKindle();
+        document.getElementById("btn-lojas").addEventListener("click", atualizarDasLojas);
+        document.getElementById("btn-lojas-cancelar").addEventListener("click", fecharLojas);
+        document.getElementById("btn-lojas-confirmar").addEventListener("click", confirmarLojas);
+        document.getElementById("modal-lojas").addEventListener("click", (e) => {
+            if (e.target.id === "modal-lojas") fecharLojas();
         });
 
         document.getElementById("btn-encerrar").addEventListener("click", encerrarInterface);

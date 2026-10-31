@@ -9,7 +9,8 @@
 /* Begin PBXBuildFile section */
 		0C5EA7E4189B10DA40D369C6 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = 13888876EF082DF0B6BDFF0E /* AppIcon.icns */; };
 		0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */; };
-		F13A87137E0449B1AF044AD8 /* Kindle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CF3D4E80DB48B787594AFC /* Kindle.swift */; };
+		5A274593D1CA8D10124459ED /* Audible.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C26CD6287EC8DDB8D1AE7B /* Audible.swift */; };
+		7930EF87EA2A64BDD2248EED /* Kindle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 590DC66446B96D1725A8A8D4 /* Kindle.swift */; };
 		F1E95BECFEF287E4DEDF55B0 /* biblioteca.html in Resources */ = {isa = PBXBuildFile; fileRef = 57400D1513BF567EE710732A /* biblioteca.html */; };
 /* End PBXBuildFile section */
 
@@ -17,8 +18,9 @@
 		13888876EF082DF0B6BDFF0E /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		45514A6994E13C15FF7F90F4 /* BibliotecaWeb.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BibliotecaWeb.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		57400D1513BF567EE710732A /* biblioteca.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = biblioteca.html; sourceTree = "<group>"; };
+		590DC66446B96D1725A8A8D4 /* Kindle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kindle.swift; sourceTree = "<group>"; };
 		97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BibliotecaWebApp.swift; sourceTree = "<group>"; };
-		F5CF3D4E80DB48B787594AFC /* Kindle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Kindle.swift; sourceTree = "<group>"; };
+		C3C26CD6287EC8DDB8D1AE7B /* Audible.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Audible.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -34,8 +36,9 @@
 		7C398C83BC19289DEF169877 /* BibliotecaMacWeb */ = {
 			isa = PBXGroup;
 			children = (
+				C3C26CD6287EC8DDB8D1AE7B /* Audible.swift */,
 				97C45B77B8FEBD3EE15DCA2A /* BibliotecaWebApp.swift */,
-				F5CF3D4E80DB48B787594AFC /* Kindle.swift */,
+				590DC66446B96D1725A8A8D4 /* Kindle.swift */,
 			);
 			name = BibliotecaMacWeb;
 			path = Sources/BibliotecaMacWeb;
@@ -131,8 +134,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A274593D1CA8D10124459ED /* Audible.swift in Sources */,
 				0F8F1FC5E713DCB56F51D708 /* BibliotecaWebApp.swift in Sources */,
-				F13A87137E0449B1AF044AD8 /* Kindle.swift in Sources */,
+				7930EF87EA2A64BDD2248EED /* Kindle.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
