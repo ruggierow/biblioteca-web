@@ -27,11 +27,27 @@ fn arquivo_config() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("Biblioteca").join("pasta.txt"))
 }
 
-/// Pasta configurada manualmente, se houver e se ainda existir.
-fn pasta_configurada() -> Option<PathBuf> {
+/// O texto da pasta configurada, limpo. `None` quando nao ha arquivo ou esta
+/// vazio — mas Some(...) mesmo que a pasta NAO exista, para quem chama poder
+/// avisar a diferenca entre "nada configurado" e "configurado e inalcancavel".
+fn pasta_configurada_texto() -> Option<String> {
     let cfg = arquivo_config()?;
     let texto = fs::read_to_string(cfg).ok()?;
-    let caminho = PathBuf::from(texto.trim());
+    // O BOM do UTF-8 (U+FEFF) NAO e espaco em branco, entao `trim()` nao o
+    // remove — e o Bloco de Notas grava UTF-8 com BOM por padrao, assim como o
+    // `Set-Content -Encoding UTF8` do PowerShell.
+    //
+    // Em 03/11/2026 um pasta.txt com BOM fez o caminho virar invalido,
+    // `is_dir()` responder falso e o aplicativo cair na pasta velha do iCloud
+    // — que estava parada havia um mes. Sem erro, sem aviso: o usuario via a
+    // biblioteca de outubro e nao tinha como saber por que.
+    let limpo = texto.trim().trim_start_matches('\u{feff}').trim();
+    if limpo.is_empty() { None } else { Some(limpo.to_string()) }
+}
+
+/// Pasta configurada manualmente, se houver e se ainda existir.
+fn pasta_configurada() -> Option<PathBuf> {
+    let caminho = PathBuf::from(pasta_configurada_texto()?);
     if caminho.is_dir() { Some(caminho) } else { None }
 }
 
@@ -526,9 +542,12 @@ fn info_do_arquivo() -> String {
         .and_then(|t| time::OffsetDateTime::from(t).format(
             &time::format_description::well_known::Rfc3339).ok())
         .unwrap_or_default();
-    let configurada = pasta_configurada()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
+    // O TEXTO configurado, nao a pasta resolvida: quando a pasta nao existe,
+    // `pasta_configurada()` devolve None, `configurada` ficava vazia e o
+    // `usando_configurada` abaixo concluia que estava tudo bem — deixando a
+    // faixa de ATENCAO da pagina inalcancavel justamente no caso que ela
+    // existe para cobrir.
+    let configurada = pasta_configurada_texto().unwrap_or_default();
     let usando_configurada = configurada.is_empty()
         || caminho.parent().map(|p| p.to_string_lossy().to_string()) == Some(configurada.clone());
     serde_json::json!({
