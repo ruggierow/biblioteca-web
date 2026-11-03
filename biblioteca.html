@@ -3375,13 +3375,18 @@
         /// BIBLIOTECA, a mesma historia do `kindle://`. E vai SEM a forma de
         /// consulta, senao `kindleAsinsDaBase()` passaria a tratar ASIN de
         /// audiolivro como ASIN de Kindle.
+        /// O link vem PRIMEIRO, e isso nao e estetica: a celula da tabela corta
+        /// em tres linhas, e com o endereco no fim o rotulo ficava FORA do
+        /// corte em toda largura (caixa de 59 px, link em y=60). No Mac ele
+        /// ainda aparecia, porque o WebKit desenha o ultimo elemento depois das
+        /// reticencias; no Windows nao, porque o WebView2 e Chromium. Medido em
+        /// 03/11/2026, com o usuario vendo o recurso faltar so numa maquina.
         function audibleComentario(l) {
-            const partes = [];
+            const partes = [`Ouvir: https://www.audible.com.br/pd/${l.asin}`];
             if (!l.paraSempre) partes.push(AUDIBLE_A_ADQUIRIR);
             const extras = (l.autores || []).slice(1);
             if (extras.length) partes.push("Outros creditos: " + audibleAteTres(extras));
             if ((l.narradores || []).length) partes.push("Narrado por " + audibleAteTres(l.narradores));
-            partes.push(`Ouvir: https://www.audible.com.br/pd/${l.asin}`);
             return partes.join(" | ");
         }
 

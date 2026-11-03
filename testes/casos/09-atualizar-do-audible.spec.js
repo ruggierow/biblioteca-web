@@ -84,7 +84,7 @@ test.describe("Atualizar do Audible", () => {
     expect(base).toHaveLength(1);
     expect(base[0].local).toBe("Audio book");
     expect(base[0].ano).toBe(2023);
-    expect(base[0].comentarios).toBe(`A ser adquirido. | ${OUVIR("B0AUDIO0001")}`);
+    expect(base[0].comentarios).toBe(`${OUVIR("B0AUDIO0001")} | A ser adquirido.`);
   });
 
   test("o que ja e SEU nao leva 'A ser adquirido.'", async ({ page }) => {
@@ -166,7 +166,41 @@ test.describe("Atualizar do Audible", () => {
     const base = await livrosGravados(page);
     expect(base[0].autores).toEqual(["Thomas Mann"]);
     expect(base[0].comentarios).toBe(
-      `Outros creditos: Um, Dois, Tres e outros | Narrado por Voz | ${OUVIR("B0AUDIO0001")}`);
+      `${OUVIR("B0AUDIO0001")} | Outros creditos: Um, Dois, Tres e outros | Narrado por Voz`);
+  });
+
+  // A celula da tabela corta em tres linhas. Com o endereco no fim, o rotulo
+  // caia FORA do corte no Chromium (o motor do Windows) e so aparecia no
+  // WebKit do Mac — o usuario viu o recurso faltar numa maquina so, em
+  // 03/11/2026. O link na frente cabe na primeira linha em qualquer motor.
+  test("o link e a PRIMEIRA coisa do comentario", async ({ page }) => {
+    await abrirComLojas(page, [], {
+      audible: RESPOSTA([doAudible("Com muito texto antes", {
+        naBiblioteca: true, autores: ["A", "B", "C", "D"], narradores: ["N1", "N2"],
+      })]),
+    });
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
+    const base = await livrosGravados(page);
+    expect(base[0].comentarios.startsWith("Ouvir: https://")).toBe(true);
+  });
+
+  test("o rotulo do link fica VISIVEL na celula, sem ser cortado", async ({ page }) => {
+    await abrirComLojas(page, [], {
+      audible: RESPOSTA([doAudible("Com muito texto antes", {
+        naBiblioteca: true, autores: ["Autor", "Um", "Dois", "Tres", "Quatro"],
+        narradores: ["Voz Um", "Voz Dois", "Voz Tres", "Voz Quatro"],
+      })]),
+    });
+    await page.click("#btn-lojas");
+    await page.click("#btn-lojas-confirmar");
+    const cortado = await page.$eval(".cell-comentario .conteudo", d => {
+      const a = d.querySelector("a");
+      if (!a) return "SEM LINK";
+      const cx = d.getBoundingClientRect(), ax = a.getBoundingClientRect();
+      return ax.bottom > cx.bottom + 1 || ax.top >= cx.bottom;
+    });
+    expect(cortado).toBe(false);
   });
 
   test("o link do Audible nao e lido como ASIN do Kindle", async ({ page }) => {
