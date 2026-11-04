@@ -127,4 +127,109 @@ test.describe("Idioma", () => {
     });
     expect(texto).toBe("Pesquisar");
   });
+
+  /**
+   * A FICHA IMPRESSA E A PLANILHA — a 2a etapa.
+   *
+   * Nenhuma das duas aparece na tela: `imprimirDocumento` abre outra janela e
+   * a planilha sai como arquivo. Aqui a janela e trocada por uma funcao que
+   * guarda o HTML, e a planilha e lida como bytes — o ZIP que a pagina monta
+   * guarda os XML SEM compressao, entao o texto esta a vista.
+   */
+  test.describe("impressao e planilha", () => {
+    const comLivro = [livro("Pride and Prejudice", { local: "Shelf 3" })];
+
+    async function fichaDe(page) {
+      return page.evaluate(() => {
+        let capturado = "";
+        const original = window.imprimirDocumento;
+        window.imprimirDocumento = (html) => { capturado = html; };
+        imprimirLivro(biblioteca[0]);
+        window.imprimirDocumento = original;
+        return capturado;
+      });
+    }
+
+    async function relatorioDe(page) {
+      return page.evaluate(() => {
+        let capturado = "";
+        const original = window.imprimirDocumento;
+        window.imprimirDocumento = (html) => { capturado = html; };
+        imprimirResultados();
+        window.imprimirDocumento = original;
+        return capturado;
+      });
+    }
+
+    /** O texto cru do .xlsx: o ZIP guarda os XML sem comprimir. */
+    async function planilhaDe(page) {
+      return page.evaluate(() => {
+        const bytes = gerarXLSX(aplicarFiltros());
+        return new TextDecoder("latin1").decode(bytes);
+      });
+    }
+
+    test("em portugues, as tres saem em portugues", async ({ page }) => {
+      await abrir(page, comLivro);
+      const ficha = await fichaDe(page);
+      expect(ficha).toContain("Cadastro do Livro");
+      expect(ficha).toContain("<dt>Titulo</dt>");
+      expect(ficha).toContain("Disponivel");
+
+      const relatorio = await relatorioDe(page);
+      expect(relatorio).toContain("Relatorio de Livros");
+      expect(relatorio).toContain("Filtros aplicados:");
+      expect(relatorio).toContain('lang="pt-BR"');
+
+      const planilha = await planilhaDe(page);
+      expect(planilha).toContain("Comentarios");
+      expect(planilha).toContain('name="Resultados"');
+    });
+
+    test.describe("num aparelho em ingles", () => {
+      test.use({ locale: "en-US" });
+
+      test("a ficha de um livro sai em ingles", async ({ page }) => {
+        await abrir(page, comLivro);
+        const ficha = await fichaDe(page);
+        expect(ficha).toContain("Book record");
+        expect(ficha).toContain("<dt>Title</dt>");
+        expect(ficha).toContain("<dt>Status</dt><dd>Available</dd>");
+        expect(ficha).toContain('lang="en"');
+        expect(ficha).not.toContain("Cadastro do Livro");
+      });
+
+      test("o relatorio da pesquisa sai em ingles", async ({ page }) => {
+        await abrir(page, comLivro);
+        const relatorio = await relatorioDe(page);
+        expect(relatorio).toContain("Book report");
+        expect(relatorio).toContain("Filters applied:");
+        expect(relatorio).toContain("Generated on:");
+        expect(relatorio).toContain("Books in total:");
+        expect(relatorio).toContain("record(s)");
+        expect(relatorio).toContain('lang="en"');
+        expect(relatorio).not.toContain("Relatorio de Livros");
+      });
+
+      test("a planilha sai em ingles, cabecalho e aba", async ({ page }) => {
+        await abrir(page, comLivro);
+        const planilha = await planilhaDe(page);
+        for (const coluna of ["Title", "Author(s)", "Subject(s)", "Year",
+                              "Status", "Location", "Reading group", "Notes"]) {
+          expect(planilha).toContain(coluna);
+        }
+        expect(planilha).toContain('name="Results"');
+        expect(planilha).not.toContain("Grupo Literatura");
+      });
+
+      test("o filtro escrito no cabecalho do relatorio tambem e traduzido", async ({ page }) => {
+        await abrir(page, comLivro);
+        await page.fill("#filtro-titulo", "pride");
+        await page.selectOption("#filtro-status", "disponivel");
+        const relatorio = await relatorioDe(page);
+        expect(relatorio).toContain('Title: "pride"');
+        expect(relatorio).toContain("Status: Available");
+      });
+    });
+  });
 });

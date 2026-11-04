@@ -1713,6 +1713,21 @@
             trocarParaEsteArquivo: "Trocar para este arquivo?\n\n",
             contadorCategorias: "${0} tema(s), ${1} autor(es)",
             appKindle: "app Kindle",
+
+            // --- ficha de impressao, relatorio e planilha ---
+            fichaDoCadastro: "Cadastro do Livro",
+            fichaComentarios: "Comentarios",
+            fichaSemGrupo: "Nao",
+            qualquerGrupoLiteratura: "Qualquer grupo de literatura",
+            relatorioDeLivros: "Relatorio de Livros",
+            geradoEm: "Gerado em: ${0}",
+            totalDeLivros: "Total de livros: ",
+            filtrosAplicados: "Filtros aplicados:",
+            rodapeDoRelatorio: "Biblioteca &mdash; Relatorio gerado automaticamente",
+            registros: "${0} registro(s)",
+            resultadosDaPesquisa: "Resultados da pesquisa",
+            abaResultados: "Resultados",
+            planilhaSalvaEm: "Planilha salva em ~/Downloads/resultados_biblioteca.xlsx",
             zipInvalido: "Arquivo ZIP inválido",
             abaNaoEncontrada: "Aba \"2017-2026\" não encontrada no arquivo",
             planilhaNaoEncontrada: "Planilha não encontrada no arquivo",
@@ -2059,6 +2074,21 @@
             trocarParaEsteArquivo: "Switch to this file?\n\n",
             contadorCategorias: "${0} subject(s), ${1} author(s)",
             appKindle: "Kindle app",
+
+            // --- ficha de impressao, relatorio e planilha ---
+            fichaDoCadastro: "Book record",
+            fichaComentarios: "Notes",
+            fichaSemGrupo: "No",
+            qualquerGrupoLiteratura: "Any reading group",
+            relatorioDeLivros: "Book report",
+            geradoEm: "Generated on: ${0}",
+            totalDeLivros: "Books in total: ",
+            filtrosAplicados: "Filters applied:",
+            rodapeDoRelatorio: "Library &mdash; report generated automatically",
+            registros: "${0} record(s)",
+            resultadosDaPesquisa: "Search results",
+            abaResultados: "Results",
+            planilhaSalvaEm: "Spreadsheet saved to ~/Downloads/resultados_biblioteca.xlsx",
             zipInvalido: "Invalid ZIP file",
             abaNaoEncontrada: "Sheet \"2017-2026\" not found in the file",
             planilhaNaoEncontrada: "Spreadsheet not found in the file",
@@ -5329,7 +5359,7 @@
         // === Impressao individual ===
         function imprimirLivro(livro) {
             imprimirDocumento(`
-                <html><head><title>Cadastro do Livro</title>
+                <html lang="${IDIOMA === "pt" ? "pt-BR" : "en"}"><head><meta charset="UTF-8"><title>${t("fichaDoCadastro")}</title>
                 <style>
                     body { font-family: -apple-system, sans-serif; padding: 32px; color: #222; }
                     h1 { font-size: 18px; border-bottom: 2px solid #222; padding-bottom: 8px; }
@@ -5337,19 +5367,19 @@
                     dt { font-weight: 600; margin-top: 8px; }
                     dd { margin: 2px 0 0; }
                 </style></head><body>
-                <h1>Cadastro do Livro</h1>
+                <h1>${t("fichaDoCadastro")}</h1>
                 <dl>
-                    <dt>Titulo</dt><dd>${escapeHtml(livro.titulo)}</dd>
-                    <dt>Autor(es)</dt><dd>${escapeHtml(autoresParaTexto(livro))}</dd>
-                    <dt>Tema(s)</dt><dd>${escapeHtml(temasParaTexto(livro))}</dd>
-                    <dt>Ano</dt><dd>${livro.ano}</dd>
-                    <dt>Status</dt><dd>${livro.emprestado ? "Emprestado" : "Disponivel"}</dd>
-                    ${(livro.local || "").trim() ? `<dt>Local</dt><dd>${escapeHtml(livro.local)}</dd>` : ""}
-                    ${(livro.comentarios || "").trim() ? `<dt>Comentarios</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios, livro.titulo)}</dd>` : ""}
-                    <dt>Grupos de Literatura</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : "Nao"}</dd>
+                    <dt>${t("colTitulo")}</dt><dd>${escapeHtml(livro.titulo)}</dd>
+                    <dt>${t("autores")}</dt><dd>${escapeHtml(autoresParaTexto(livro))}</dd>
+                    <dt>${t("temasRotulo")}</dt><dd>${escapeHtml(temasParaTexto(livro))}</dd>
+                    <dt>${t("colAno")}</dt><dd>${livro.ano}</dd>
+                    <dt>${t("colStatus")}</dt><dd>${livro.emprestado ? t("emprestado") : t("disponivel")}</dd>
+                    ${(livro.local || "").trim() ? `<dt>${t("colLocal")}</dt><dd>${escapeHtml(livro.local)}</dd>` : ""}
+                    ${(livro.comentarios || "").trim() ? `<dt>${t("fichaComentarios")}</dt><dd style="white-space:pre-wrap;">${comLinks(livro.comentarios, livro.titulo)}</dd>` : ""}
+                    <dt>${t("gruposLiteratura")}</dt><dd>${nomeGrupos(livro) ? "&#10003; " + escapeHtml(nomeGrupos(livro)) : t("fichaSemGrupo")}</dd>
                 </dl>
                 </body></html>
-            `, "Cadastro do Livro");
+            `, t("fichaDoCadastro"));
         }
 
         // === Impressao de resultados da pesquisa ===
@@ -5368,16 +5398,16 @@
             const fl = document.getElementById("filtro-local").value.trim();
             const fs = document.getElementById("filtro-status").value;
             const fg = document.getElementById("filtro-grupo").value;
-            if (ft) filtros.push(`Titulo: "${ft}"`);
-            if (fa) filtros.push(`Autor: "${fa}"`);
-            if (fm) filtros.push(`Tema: "${fm}"`);
-            if (fl) filtros.push(`Local: "${fl}"`);
-            if (fs !== "todos") filtros.push(`Status: ${fs === "disponivel" ? "Disponiveis" : "Emprestados"}`);
-            if (fg === "qualquer") filtros.push("Qualquer grupo de literatura");
-            else if (fg) { const g = grupos.find(x => x.id === parseInt(fg, 10)); filtros.push(`Grupo: ${g ? g.nome : fg}`); }
-            const descFiltros = filtros.length > 0 ? filtros.join(" &bull; ") : "Todos os livros";
+            if (ft) filtros.push(`${t("colTitulo")}: "${ft}"`);
+            if (fa) filtros.push(`${t("colAutor")}: "${fa}"`);
+            if (fm) filtros.push(`${t("colTema")}: "${fm}"`);
+            if (fl) filtros.push(`${t("colLocal")}: "${fl}"`);
+            if (fs !== "todos") filtros.push(`${t("colStatus")}: ${fs === "disponivel" ? t("disponiveis") : t("emprestados")}`);
+            if (fg === "qualquer") filtros.push(t("qualquerGrupoLiteratura"));
+            else if (fg) { const g = grupos.find(x => x.id === parseInt(fg, 10)); filtros.push(`${t("colGrupo")}: ${g ? g.nome : fg}`); }
+            const descFiltros = filtros.length > 0 ? filtros.join(" &bull; ") : t("todosOsLivros");
 
-            const dataHora = new Date().toLocaleString("pt-BR", {
+            const dataHora = new Date().toLocaleString(IDIOMA === "pt" ? "pt-BR" : "en-US", {
                 day: "2-digit", month: "2-digit", year: "numeric",
                 hour: "2-digit", minute: "2-digit"
             });
@@ -5388,8 +5418,8 @@
                     ? `<span style="color:#166b48;font-weight:600;" title="${escapeHtml(nG)}">&#10003; ${escapeHtml(nG)}</span>`
                     : `<span style="color:#bbb;">&#8212;</span>`;
                 const status = livro.emprestado
-                    ? `<span style="color:#9d2d22;font-weight:600;">Emprestado</span>`
-                    : `<span style="color:#166b48;">Disponivel</span>`;
+                    ? `<span style="color:#9d2d22;font-weight:600;">${t("emprestado")}</span>`
+                    : `<span style="color:#166b48;">${t("disponivel")}</span>`;
                 const fundo = i % 2 === 0 ? "#ffffff" : "#f5f7fb";
                 return `
                 <tr style="background:${fundo};">
@@ -5405,10 +5435,10 @@
             }).join("");
 
             const html = `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="${IDIOMA === "pt" ? "pt-BR" : "en"}">
 <head>
 <meta charset="UTF-8">
-<title>Relatorio de Livros</title>
+<title>${t("relatorioDeLivros")}</title>
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -5492,41 +5522,41 @@
 <body>
 <div class="cabecalho">
     <div>
-        <h1>&#128218; Sistema de Gestao de Biblioteca</h1>
-        <div style="font-size:10pt;color:#555;margin-top:3px;">Relatorio de Livros</div>
+        <h1>&#128218; ${t("tituloApp")}</h1>
+        <div style="font-size:10pt;color:#555;margin-top:3px;">${t("relatorioDeLivros")}</div>
     </div>
     <div class="meta">
-        Gerado em: ${dataHora}<br>
-        Total de livros: <strong>${filtrados.length}</strong>
+        ${t("geradoEm", dataHora)}<br>
+        ${t("totalDeLivros")}<strong>${filtrados.length}</strong>
     </div>
 </div>
 <div class="filtros">
-    <strong>Filtros aplicados:</strong> ${descFiltros}
+    <strong>${t("filtrosAplicados")}</strong> ${descFiltros}
 </div>
 <table>
     <thead>
         <tr>
             <th style="width:36px;text-align:center;">#</th>
-            <th style="min-width:180px;">Titulo</th>
-            <th style="min-width:140px;">Autor(es)</th>
-            <th style="min-width:110px;">Tema(s)</th>
-            <th style="width:50px;text-align:center;">Ano</th>
-            <th style="width:90px;text-align:center;">Status</th>
-            <th style="min-width:100px;">Local</th>
-            <th style="width:60px;text-align:center;">Grupo</th>
+            <th style="min-width:180px;">${t("colTitulo")}</th>
+            <th style="min-width:140px;">${t("autores")}</th>
+            <th style="min-width:110px;">${t("temasRotulo")}</th>
+            <th style="width:50px;text-align:center;">${t("colAno")}</th>
+            <th style="width:90px;text-align:center;">${t("colStatus")}</th>
+            <th style="min-width:100px;">${t("colLocal")}</th>
+            <th style="width:60px;text-align:center;">${t("colGrupo")}</th>
         </tr>
     </thead>
     <tbody>${linhas}</tbody>
 </table>
 <div class="rodape">
-    <span>Biblioteca &mdash; Relatorio gerado automaticamente</span>
-    <span>${filtrados.length} registro(s)</span>
+    <span>${t("rodapeDoRelatorio")}</span>
+    <span>${t("registros", filtrados.length)}</span>
 </div>
 <script>window.onload = () => window.print();<\/script>
 </body>
 </html>`;
 
-            imprimirDocumento(html, "Resultados da pesquisa");
+            imprimirDocumento(html, t("resultadosDaPesquisa"));
         }
 
         document.getElementById("btn-imprimir-resultados").addEventListener("click", imprimirResultados);
@@ -5599,7 +5629,8 @@
                 return strIdx[k];
             }
 
-            const cabecalho = ["#", "Titulo", "Autor(es)", "Tema(s)", "Ano", "Status", "Local", "Grupo Literatura", "Comentarios"];
+            const cabecalho = ["#", t("colTitulo"), t("autores"), t("temasRotulo"), t("colAno"),
+                               t("colStatus"), t("colLocal"), t("grupoLiteraturaDica"), t("fichaComentarios")];
             const larguras  = [5,    35,        25,           20,        7,     15,        20,      12,                  45];
             // s=1: cabeçalho (negrito, bordas médias, sem wrap)
             // s=2: dados (bordas médias verticais + finas horizontais, wrap, centro vertical)
@@ -5617,7 +5648,7 @@
                     {t: "s", v: S(autoresParaTexto(lv)),                         s: 2},
                     {t: "s", v: S(temasParaTexto(lv)),                           s: 2},
                     isNaN(anoNum) ? {t: "s", v: S(""), s: 2} : {t: "n", v: anoNum, s: 2},
-                    {t: "s", v: S(lv.emprestado ? "Emprestado" : "Disponivel"),  s: 2},
+                    {t: "s", v: S(lv.emprestado ? t("emprestado") : t("disponivel")), s: 2},
                     {t: "s", v: S(lv.local || ""),                               s: 2},
                     {t: "s", v: S(nomeGrupos(lv) || ""),                          s: 2},
                     {t: "s", v: S(lv.comentarios || ""),                         s: 2},
@@ -5669,7 +5700,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
 
             const wbXML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="Resultados" sheetId="1" r:id="rId1"/></sheets>
+<sheets><sheet name="${xmlEsc(t("abaResultados"))}" sheetId="1" r:id="rId1"/></sheets>
 </workbook>`;
 
             const wbRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -5744,7 +5775,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
             link.click();
             URL.revokeObjectURL(url);
             const el = document.getElementById("toast");
-            el.textContent = "Planilha salva em ~/Downloads/resultados_biblioteca.xlsx";
+            el.textContent = t("planilhaSalvaEm");
             el.classList.add("show");
             clearTimeout(toast._t);
             toast._t = setTimeout(() => el.classList.remove("show"), 6000);
