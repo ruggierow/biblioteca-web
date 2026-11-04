@@ -11,6 +11,11 @@ const { defineConfig } = require("@playwright/test");
  * `target="_blank"` abre — no WKWebView, nenhum dos tres. Essa familia de
  * defeito e do `bin/conferir-ponte.py`, nao daqui. Os dois juntos cobrem; cada
  * um sozinho engana.
+ *
+ * O `locale` e OBRIGATORIO desde que a pagina ganhou ingles. Sem ele o
+ * Playwright anuncia `en-US`, a pagina escolhe ingles sozinha e os 73 casos
+ * escritos em portugues quebram todos de uma vez — sem defeito nenhum no app.
+ * Quem mede o ingles e o `10-idioma.spec.js`, que pede `en-US` para si.
  */
 module.exports = defineConfig({
   testDir: "./casos",
@@ -20,6 +25,7 @@ module.exports = defineConfig({
   use: {
     baseURL: "http://127.0.0.1:8731",
     actionTimeout: 5000,
+    locale: "pt-BR",
   },
   webServer: {
     command: "python3 -m http.server 8731 --bind 127.0.0.1 --directory ..",
