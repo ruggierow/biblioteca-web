@@ -1118,7 +1118,7 @@
                 <span id="sync-mensagem" data-i18n="inicializando">Inicializando...</span>
             </div>
             <p style="margin:0 0 12px; color: var(--muted); font-size: 13px;">
-                <span data-i18n-html="vincularAjuda">Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente.
+                <span id="ajuda-arquivo" data-i18n-html="vincularAjuda">Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente.
                 Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.</span>
             </p>
             <div class="button-row">
@@ -1478,6 +1478,11 @@
             arquivoBiblioteca: "Arquivo biblioteca.txt",
             inicializando: "Inicializando...",
             vincularAjuda: "Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente. Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.",
+            // No aplicativo instalado a frase acima e falsa duas vezes: nao ha o
+            // que "vincular" (o arquivo ja esta ligado) e nao ha navegador sem
+            // suporte. Ela aparecia assim mesmo, no Mac e no Windows, inclusive
+            // nas figuras do manual.
+            vincularAjudaApp: "O seu <code>biblioteca.txt</code> e gravado a cada alteracao. Use <b>Selecionar pasta</b> para escolher em que pasta ele fica.",
             vincularPasta: "Vincular pasta",
 
             // --- selecionar pasta: o mesmo primeiro acesso das quatro plataformas ---
@@ -1855,6 +1860,7 @@
             arquivoBiblioteca: "The biblioteca.txt file",
             inicializando: "Starting up...",
             vincularAjuda: "Link a <code>biblioteca.txt</code> file so that every change is written to it automatically. In browsers without support (Safari/Firefox), use Export to download a copy.",
+            vincularAjudaApp: "Your <code>biblioteca.txt</code> is saved on every change. Use <b>Choose folder</b> to pick which folder it lives in.",
             vincularPasta: "Link folder",
 
             // --- selecionar pasta: o mesmo primeiro acesso das quatro plataformas ---
@@ -3126,6 +3132,14 @@
                 if (btnR) btnR.style.display = "";
                 const btnSP = document.getElementById("btn-selecionar-pasta");
                 if (btnSP) btnSP.style.display = "";
+                // A frase de ajuda fala de "vincular" e de navegador sem
+                // suporte: aqui nao ha nem um nem outro. Troca a CHAVE, nao so
+                // o texto, senao a proxima troca de idioma traz a velha de volta.
+                const ajuda = document.getElementById("ajuda-arquivo");
+                if (ajuda) {
+                    ajuda.dataset.i18nHtml = "vincularAjudaApp";
+                    ajuda.innerHTML = t("vincularAjudaApp");
+                }
                 return;
             }
 
@@ -3181,6 +3195,14 @@
                 // existe caminho de arquivo e "pasta" nao quer dizer nada.
                 const btnSP = document.getElementById("btn-selecionar-pasta");
                 if (btnSP) btnSP.style.display = "";
+                // A frase de ajuda fala de "vincular" e de navegador sem
+                // suporte: aqui nao ha nem um nem outro. Troca a CHAVE, nao so
+                // o texto, senao a proxima troca de idioma traz a velha de volta.
+                const ajuda = document.getElementById("ajuda-arquivo");
+                if (ajuda) {
+                    ajuda.dataset.i18nHtml = "vincularAjudaApp";
+                    ajuda.innerHTML = t("vincularAjudaApp");
+                }
                 return;
             }
 

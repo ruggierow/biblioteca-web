@@ -229,6 +229,23 @@ for (const HOSPEDEIRO of ["Windows", "Mac"]) {
       expect(erros).toEqual([]);
     });
 
+    test("a frase de ajuda fala do APP, não do navegador", async ({ page }) => {
+      // "Vincule um arquivo..." e "navegadores sem suporte (Safari/Firefox)" são
+      // falsas as duas aqui dentro: o arquivo já está ligado e não há navegador.
+      // Apareciam assim mesmo nos dois aplicativos, inclusive nas figuras do
+      // manual.
+      await abrir(page, {
+        disco: { [NUVEM]: { "biblioteca.txt": tsv("Um") } }, configurada: NUVEM, escolhas: [],
+      });
+      const ajuda = page.locator("#ajuda-arquivo");
+      await expect(ajuda).toContainText("Selecionar pasta");
+      await expect(ajuda).not.toContainText("Safari");
+      // E a troca de idioma não traz a frase velha de volta.
+      await page.selectOption("#seletor-idioma", "en");
+      await expect(ajuda).toContainText("Choose folder");
+      await expect(ajuda).not.toContainText("Safari");
+    });
+
     test.describe("ramo A — a pasta já tem uma biblioteca", () => {
       test("diz QUANTOS livros achou, e ao confirmar passa a usá-los", async ({ page }) => {
         const erros = await abrir(page, {
