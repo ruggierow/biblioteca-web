@@ -430,25 +430,198 @@ fn listar_pastas_procuradas() -> Vec<String> {
         .collect()
 }
 
-/// Define manualmente a pasta a usar. Passe "" para voltar ao automatico.
-#[tauri::command]
-fn definir_pasta(caminho: String) -> Result<String, String> {
+/// Grava no pasta.txt a pasta escolhida, SEM BOM.
+///
+/// Esta funcao e a razao de existir do botao "Selecionar pasta": ate a 1.9.20 a
+/// unica forma de configurar a pasta era editar o pasta.txt a mao, e em
+/// 03/11/2026 o Bloco de Notas o gravou com BOM. O BOM nao e espaco em branco,
+/// o caminho virou invalido, `is_dir()` respondeu falso e o app caiu na pasta
+/// velha do iCloud — servindo, calado, a biblioteca de um mes antes.
+fn gravar_pasta_configurada(pasta: &Path) -> Result<(), String> {
     let cfg = arquivo_config().ok_or("Não foi possível determinar a pasta de configuração.")?;
     let pai = cfg.parent().ok_or("Caminho de configuração inválido.")?;
     fs::create_dir_all(pai).map_err(|e| e.to_string())?;
+    fs::write(&cfg, pasta.to_string_lossy().as_bytes()).map_err(|e| e.to_string())?;
+    // A pasta mudou: o .dat de la ainda nao foi lido nesta sessao.
+    DAT_LIDO.store(false, Ordering::SeqCst);
+    Ok(())
+}
 
+/// Define manualmente a pasta a usar. Passe "" para voltar ao automatico.
+#[tauri::command]
+fn definir_pasta(caminho: String) -> Result<String, String> {
     let limpo = caminho.trim().to_string();
     if limpo.is_empty() {
+        let cfg = arquivo_config().ok_or("Não foi possível determinar a pasta de configuração.")?;
+        let pai = cfg.parent().ok_or("Caminho de configuração inválido.")?;
+        fs::create_dir_all(pai).map_err(|e| e.to_string())?;
         let _ = fs::remove_file(&cfg);
         return Ok("Voltou à detecção automática.".to_string());
     }
     if !PathBuf::from(&limpo).is_dir() {
         return Err(format!("A pasta não existe: {}", limpo));
     }
-    fs::write(&cfg, &limpo).map_err(|e| e.to_string())?;
-    // A pasta mudou: o .dat de la ainda nao foi lido nesta sessao.
-    DAT_LIDO.store(false, Ordering::SeqCst);
+    gravar_pasta_configurada(Path::new(&limpo))?;
     Ok(limpo)
+}
+
+/// O roteiro de PowerShell do seletor de pastas.
+///
+/// Separado do comando para poder ser MEDIDO: o teste
+/// `o_roteiro_do_seletor_atravessa_o_powershell` o roda de verdade, trocando
+/// so a linha do `ShowDialog` (que esperaria por uma pessoa). O que ele mede e
+/// a travessia: a aspa simples dobrada, o caminho com espaco e acento, e o
+/// texto voltando pelo ARQUIVO em UTF-8 sem BOM.
+///
+/// NAO use aspas DUPLAS aqui. O roteiro inteiro viaja como UM argumento de
+/// `-Command`, e aspa dupla dentro dele teria de sobreviver a tres camadas de
+/// citacao (Rust, linha de comando do Windows, PowerShell). Com aspas simples
+/// nao ha o que escapar — so a propria aspa simples, que se dobra.
+fn script_do_seletor(inicial: &str, destino: &str) -> String {
+    let citar = |s: &str| s.replace('\'', "''");
+    format!(
+        "Add-Type -AssemblyName System.Windows.Forms; \
+         $d = New-Object System.Windows.Forms.FolderBrowserDialog; \
+         $d.Description = 'Escolha a pasta onde fica o seu biblioteca.txt'; \
+         $d.ShowNewFolderButton = $true; \
+         $p = '{}'; \
+         if ($p -ne '' -and (Test-Path -LiteralPath $p)) {{ $d.SelectedPath = $p }}; \
+         if ($d.ShowDialog() -eq 'OK') {{ \
+             [IO.File]::WriteAllText('{}', $d.SelectedPath, (New-Object Text.UTF8Encoding $false)) \
+         }}",
+        citar(inicial),
+        citar(destino),
+    )
+}
+
+/// Abre o seletor de pastas do Windows e devolve o caminho escolhido.
+///
+/// Devolve `Ok("")` quando o usuario fecha sem escolher: cancelar NAO e erro, e
+/// trata-lo como erro faria a pagina mostrar um aviso a quem so mudou de ideia.
+///
+/// Comeca na pasta que o app esta usando (ou na que ele usaria para criar).
+/// Assim o passo vira uma CONFIRMACAO em vez de uma procura, e o acerto
+/// automatico do iCloud nao se perde.
+///
+/// POR QUE PowerShell e nao um plugin de dialogo: o `copiar_texto` deste mesmo
+/// arquivo ja conversa com o Windows assim, e isto evita uma dependencia nova
+/// — com a permissao de capacidade que vem junto, que, se faltasse, faria o
+/// botao nao fazer NADA so no Windows, e em silencio.
+///
+/// O caminho volta por ARQUIVO, nao pela saida padrao: a saida do PowerShell
+/// sai na pagina de codigo do console e um nome de pasta com acento voltaria
+/// corrompido. `WriteAllText` com UTF-8 sem BOM volta exato.
+#[tauri::command]
+fn escolher_pasta() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let inicial = caminho_base()
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let tmp = std::env::temp_dir().join(format!("biblioteca-pasta-{}.txt", std::process::id()));
+        let _ = fs::remove_file(&tmp);
+        let script = script_do_seletor(&inicial, &tmp.to_string_lossy());
+        // Sem -STA o FolderBrowserDialog nao abre: ele exige apartamento de
+        // thread unica. E sem -NonInteractive de proposito -- aqui a interacao
+        // com o usuario E o objetivo.
+        let saida = Command::new("powershell")
+            .args(["-NoProfile", "-STA", "-Command", &script])
+            .output()
+            .map_err(|e| e.to_string())?;
+        if !saida.status.success() {
+            let _ = fs::remove_file(&tmp);
+            return Err(String::from_utf8_lossy(&saida.stderr).trim().to_string());
+        }
+        let escolhido = fs::read_to_string(&tmp).unwrap_or_default();
+        let _ = fs::remove_file(&tmp);
+        return Ok(escolhido.trim().to_string());
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("seletor de pasta nao implementado nesta plataforma".into())
+    }
+}
+
+/// Olha uma pasta ANTES de vincular: ha um biblioteca.txt? da para ler? o que
+/// tem dentro?
+///
+/// Devolve o CONTEUDO, nao uma contagem. Quem conta os livros e a mesma
+/// `parseTSV` da pagina que vai carrega-los — uma contagem feita aqui seria um
+/// SEGUNDO leitor de TSV, e dois leitores divergem: ate a 1.9.13 uma linha com
+/// 9 campos entrava no arquivo e era descartada em silencio. O numero que o
+/// usuario le na pergunta tem de ser o numero que ele vai ver na tela.
+#[tauri::command]
+fn olhar_pasta(caminho: String) -> String {
+    olhar(Path::new(caminho.trim()))
+}
+
+/// O corpo do `olhar_pasta`, sem o Tauri em volta — e o que os testes exercitam.
+fn olhar(pasta: &Path) -> String {
+    let pasta = pasta.to_path_buf();
+    let nome = pasta
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| pasta.to_string_lossy().to_string());
+    let resposta = |tem: bool, conteudo: String, erro: String| {
+        serde_json::json!({
+            "nome": nome,
+            "caminho": pasta.to_string_lossy(),
+            "temArquivo": tem,
+            "conteudo": conteudo,
+            "erro": erro,
+        })
+        .to_string()
+    };
+    if !pasta.is_dir() {
+        return resposta(false, String::new(), format!("A pasta não existe: {}", pasta.display()));
+    }
+    let arquivo = pasta.join("biblioteca.txt");
+    // `exists()` tambem e verdadeiro para um DIRETORIO chamado biblioteca.txt.
+    // Isso e de proposito: ha arquivo no caminho, so nao da para ler — e o
+    // caminho certo entao e avisar, nunca criar por cima.
+    if !arquivo.exists() {
+        return resposta(false, String::new(), String::new());
+    }
+    match ler_com_retentativa(&arquivo) {
+        Ok(texto) => resposta(true, texto, String::new()),
+        Err(e) => resposta(true, String::new(), e),
+    }
+}
+
+/// Cria o biblioteca.txt na pasta e passa a usa-la.
+///
+/// NAO SOBRESCREVE: se o arquivo apareceu entre o `olhar_pasta` e esta chamada,
+/// devolve o erro `ja_existe` e quem chama volta ao ramo "achei uma
+/// biblioteca". Alguns provedores de nuvem baixam renomeando para
+/// "biblioteca (1).txt" e depois trocam os dois; sem esta checagem o app
+/// poderia zerar o arquivo de alguem no intervalo.
+///
+/// Escreve o arquivo ANTES de gravar o pasta.txt. Na ordem inversa, uma falha
+/// de escrita deixaria o app apontado para uma pasta sem biblioteca — e
+/// `pastas_candidatas()` cairia na proxima da lista, que e outra biblioteca.
+#[tauri::command]
+fn criar_na_pasta(caminho: String, conteudo: String) -> Result<String, String> {
+    let pasta = PathBuf::from(caminho.trim());
+    let arquivo = criar_arquivo_na_pasta(&pasta, &conteudo)?;
+    gravar_pasta_configurada(&pasta)?;
+    Ok(arquivo.to_string_lossy().to_string())
+}
+
+/// Cria o arquivo e devolve o caminho dele. Separado do `criar_na_pasta` para
+/// que os testes exercitem a parte que pode PERDER dado sem escrever no
+/// pasta.txt da maquina de quem roda os testes.
+fn criar_arquivo_na_pasta(pasta: &Path, conteudo: &str) -> Result<PathBuf, String> {
+    if !pasta.is_dir() {
+        return Err(format!("A pasta não existe: {}", pasta.display()));
+    }
+    let arquivo = pasta.join("biblioteca.txt");
+    if arquivo.exists() {
+        return Err("ja_existe".to_string());
+    }
+    fs::write(&arquivo, conteudo).map_err(|e| e.to_string())?;
+    Ok(arquivo)
 }
 
 /// Le o TSV completo. Retorna "" se o arquivo nao existir.
@@ -791,6 +964,9 @@ pub fn run() {
             diagnosticar,
             listar_pastas_procuradas,
             definir_pasta,
+            escolher_pasta,
+            olhar_pasta,
+            criar_na_pasta,
             iniciar_sessao,
             carregar_removidas,
             registrar_remocoes,
@@ -800,4 +976,143 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar a aplicação Biblioteca");
+}
+
+// ---------------------------------------------------------------------------
+// Testes
+//
+// So das duas funcoes do "Selecionar pasta" que mexem em arquivo. O resto do
+// fluxo -- os quatro ramos, os textos, a contagem -- e da pagina, e esta
+// medido em motor-web/testes/casos/11-selecionar-pasta.spec.js.
+//
+// Nenhum destes testes toca no pasta.txt da maquina: `criar_arquivo_na_pasta`
+// foi separado de `gravar_pasta_configurada` exatamente por isso.
+// ---------------------------------------------------------------------------
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    /// Uma pasta vazia so para este teste, apagada no fim.
+    fn pasta_de_teste(nome: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!("biblioteca-teste-{}-{}", nome, std::process::id()));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    fn json(texto: &str) -> serde_json::Value {
+        serde_json::from_str(texto).unwrap()
+    }
+
+    #[test]
+    fn pasta_vazia_nao_tem_arquivo_e_nao_tem_erro() {
+        let p = pasta_de_teste("vazia");
+        let v = json(&olhar(&p));
+        assert_eq!(v["temArquivo"], false);
+        assert_eq!(v["erro"], "");
+        assert_eq!(v["conteudo"], "");
+        let _ = fs::remove_dir_all(&p);
+    }
+
+    #[test]
+    fn pasta_com_arquivo_devolve_o_conteudo_inteiro() {
+        let p = pasta_de_teste("comlivros");
+        let tsv = "Titulo\tAutor\tTema\t2020\tEstante\n";
+        fs::write(p.join("biblioteca.txt"), tsv).unwrap();
+        let v = json(&olhar(&p));
+        assert_eq!(v["temArquivo"], true);
+        assert_eq!(v["erro"], "");
+        // O CONTEUDO, byte a byte: quem conta os livros e a parseTSV da pagina.
+        assert_eq!(v["conteudo"], tsv);
+        let _ = fs::remove_dir_all(&p);
+    }
+
+    #[test]
+    fn biblioteca_txt_que_e_pasta_da_erro_e_nao_perde_o_que_esta_la() {
+        // O ramo C. Um diretorio chamado biblioteca.txt `exists()`, entao ha
+        // "arquivo" no caminho -- so nao da para ler. O certo e avisar.
+        let p = pasta_de_teste("quebrada");
+        fs::create_dir_all(p.join("biblioteca.txt")).unwrap();
+        let v = json(&olhar(&p));
+        assert_eq!(v["temArquivo"], true);
+        assert_ne!(v["erro"], "");
+        // E criar nao pode passar por cima.
+        assert_eq!(criar_arquivo_na_pasta(&p, "x"), Err("ja_existe".to_string()));
+        assert!(p.join("biblioteca.txt").is_dir());
+        let _ = fs::remove_dir_all(&p);
+    }
+
+    #[test]
+    fn pasta_que_nao_existe_da_erro_nos_dois() {
+        let p = std::env::temp_dir().join("biblioteca-teste-inexistente-nunca-criada");
+        let _ = fs::remove_dir_all(&p);
+        assert_ne!(json(&olhar(&p))["erro"], "");
+        assert!(criar_arquivo_na_pasta(&p, "").is_err());
+    }
+
+    #[test]
+    fn criar_grava_o_conteudo_e_vazio_e_vazio() {
+        let p = pasta_de_teste("criar");
+        let arq = criar_arquivo_na_pasta(&p, "").unwrap();
+        assert_eq!(fs::read_to_string(&arq).unwrap(), "");
+        let _ = fs::remove_dir_all(&p);
+
+        let q = pasta_de_teste("criar-com-livros");
+        let tsv = "Levado\tAutor\tTema\t1999\tEstante\n";
+        let arq = criar_arquivo_na_pasta(&q, tsv).unwrap();
+        assert_eq!(fs::read_to_string(&arq).unwrap(), tsv);
+        let _ = fs::remove_dir_all(&q);
+    }
+
+    #[test]
+    fn o_roteiro_do_seletor_nao_usa_aspas_duplas_e_dobra_a_simples() {
+        let r = script_do_seletor("C:\\Pasta d'Agua", "C:\\saida.txt");
+        assert!(!r.contains('"'), "aspa dupla no roteiro: {}", r);
+        assert!(r.contains("'C:\\Pasta d''Agua'"), "aspa simples nao dobrada: {}", r);
+    }
+
+    /// O roteiro de verdade, rodado de verdade, sem a linha que esperaria uma
+    /// pessoa. Mede a TRAVESSIA — Rust, linha de comando do Windows, PowerShell
+    /// — com um caminho que tem espaco e acento. Foi para isto que o caminho
+    /// volta por arquivo e nao pela saida padrao: a saida sai na pagina de
+    /// codigo do console e "Coleção" volta corrompido.
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn o_roteiro_do_seletor_atravessa_o_powershell() {
+        use std::process::Command;
+        let pasta = std::env::temp_dir().join("Coleção de Memórias");
+        let _ = fs::create_dir_all(&pasta);
+        let destino = std::env::temp_dir().join("biblioteca-teste-seletor.txt");
+        let _ = fs::remove_file(&destino);
+
+        let script = script_do_seletor(&pasta.to_string_lossy(), &destino.to_string_lossy())
+            .replace("$d.ShowDialog() -eq 'OK'", "$true");
+        let saida = Command::new("powershell")
+            .args(["-NoProfile", "-STA", "-Command", &script])
+            .output()
+            .expect("powershell");
+        assert!(saida.status.success(), "{}", String::from_utf8_lossy(&saida.stderr));
+
+        let bytes = fs::read(&destino).expect("o roteiro nao gravou nada");
+        // Sem BOM: um pasta.txt com BOM foi o defeito de 03/11/2026.
+        assert_ne!(&bytes[0..3], &b"\xef\xbb\xbf"[..]);
+        assert_eq!(String::from_utf8(bytes).unwrap(), pasta.to_string_lossy());
+
+        let _ = fs::remove_file(&destino);
+        let _ = fs::remove_dir_all(&pasta);
+    }
+
+    #[test]
+    fn criar_nunca_sobrescreve_biblioteca_existente() {
+        // A corrida da proposta: o arquivo apareceu entre o olhar e o criar.
+        // Alguns provedores de nuvem baixam renomeando e depois trocam os dois.
+        let p = pasta_de_teste("corrida");
+        fs::write(p.join("biblioteca.txt"), "o que ja estava la").unwrap();
+        assert_eq!(criar_arquivo_na_pasta(&p, ""), Err("ja_existe".to_string()));
+        assert_eq!(
+            fs::read_to_string(p.join("biblioteca.txt")).unwrap(),
+            "o que ja estava la"
+        );
+        let _ = fs::remove_dir_all(&p);
+    }
 }

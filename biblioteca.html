@@ -1122,6 +1122,7 @@
                 Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.</span>
             </p>
             <div class="button-row">
+                <button type="button" id="btn-selecionar-pasta" class="btn-primary" style="display:none;" title="Onde o seu biblioteca.txt esta - ou vai ficar" data-i18n="selecionarPasta" data-i18n-attr="title=selecionarPastaDica">Selecionar pasta</button>
                 <button type="button" id="btn-vincular" class="btn-primary" data-i18n="vincularPasta">Vincular pasta</button>
                 <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos" data-i18n="vincularFotos" data-i18n-attr="title=vincularFotosDica">Vincular fotos (.dat)</button>
                 <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca" data-i18n="fotosOrfas" data-i18n-attr="title=fotosOrfasDica">Fotos orfas</button>
@@ -1147,6 +1148,18 @@
     </main>
 
     <!-- Modal de edicao -->
+    <div class="modal-backdrop" id="modal-pasta">
+        <div class="modal">
+            <h3 id="pasta-titulo"></h3>
+            <p id="pasta-corpo" style="color:var(--muted);font-size:13px;margin:0 0 10px;"></p>
+            <div class="button-row" style="margin-top:14px;justify-content:flex-end;">
+                <button type="button" id="btn-pasta-fechar" class="btn-ghost" data-i18n="cancelar">Cancelar</button>
+                <button type="button" id="btn-pasta-recusar" class="btn-ghost"></button>
+                <button type="button" id="btn-pasta-confirmar" class="btn-primary"></button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-backdrop" id="modal-lojas">
         <div class="modal">
             <h3 data-i18n="atualizarLojasTitulo">Atualizar do Kindle e do Audible</h3>
@@ -1466,6 +1479,21 @@
             inicializando: "Inicializando...",
             vincularAjuda: "Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente. Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.",
             vincularPasta: "Vincular pasta",
+
+            // --- selecionar pasta: o mesmo primeiro acesso das quatro plataformas ---
+            selecionarPasta: "Selecionar pasta",
+            selecionarPastaDica: "Onde o seu biblioteca.txt está — ou vai ficar",
+            achouBiblioteca: "Encontrei uma biblioteca nesta pasta",
+            achouBibliotecaCorpo: "A pasta \"${0}\" já tem um biblioteca.txt com ${1} livro(s).",
+            usarEstaBiblioteca: "Usar esta biblioteca",
+            escolherOutraPasta: "Escolher outra pasta",
+            criouArquivo: "Criei o biblioteca.txt em \"${0}\". Pode começar a cadastrar.",
+            naoConsegueLerTitulo: "Não consegui ler esta biblioteca",
+            naoConsegueLer: "Há um biblioteca.txt nesta pasta, mas não consegui lê-lo: ${0}",
+            pastaVaziaComLivros: "Esta pasta está vazia. O que fazer com os ${0} livros que estão abertos?",
+            comecarVazia: "Criar uma biblioteca nova e vazia",
+            levarParaPasta: "Levar os ${0} para esta pasta",
+            erroSelecionarPasta: "Não foi possível abrir o seletor de pastas: ${0}",
             vincularFotos: "Vincular fotos (.dat)",
             vincularFotosDica: "Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos",
             fotosOrfas: "Fotos orfas",
@@ -1828,6 +1856,21 @@
             inicializando: "Starting up...",
             vincularAjuda: "Link a <code>biblioteca.txt</code> file so that every change is written to it automatically. In browsers without support (Safari/Firefox), use Export to download a copy.",
             vincularPasta: "Link folder",
+
+            // --- selecionar pasta: o mesmo primeiro acesso das quatro plataformas ---
+            selecionarPasta: "Choose folder",
+            selecionarPastaDica: "Where your biblioteca.txt is — or will be",
+            achouBiblioteca: "Found a library in this folder",
+            achouBibliotecaCorpo: "The folder \"${0}\" already has a biblioteca.txt with ${1} book(s).",
+            usarEstaBiblioteca: "Use this library",
+            escolherOutraPasta: "Choose another folder",
+            criouArquivo: "Created biblioteca.txt in \"${0}\". You can start adding books.",
+            naoConsegueLerTitulo: "This library could not be read",
+            naoConsegueLer: "There is a biblioteca.txt in this folder, but it could not be read: ${0}",
+            pastaVaziaComLivros: "This folder is empty. What should happen to the ${0} books you have open?",
+            comecarVazia: "Start a new, empty library",
+            levarParaPasta: "Move the ${0} here",
+            erroSelecionarPasta: "The folder picker could not be opened: ${0}",
             vincularFotos: "Link photos (.dat)",
             vincularFotosDica: "Link biblioteca.dat to sync cover photos with your other devices",
             fotosOrfas: "Orphan photos",
@@ -3130,6 +3173,12 @@
                 });
                 const btnR = document.getElementById("btn-recarregar");
                 if (btnR) btnR.style.display = "";
+                // Selecionar pasta: so aparece onde o hospedeiro sabe abrir um
+                // seletor de pastas. No Mac entra na Etapa 4, quando o Swift
+                // ganhar o NSOpenPanel; no navegador comum nunca, porque la nao
+                // existe caminho de arquivo e "pasta" nao quer dizer nada.
+                const btnSP = document.getElementById("btn-selecionar-pasta");
+                if (btnSP) btnSP.style.display = "";
                 return;
             }
 
@@ -3458,6 +3507,164 @@
             atualizarBannerSync("ok");
             esconderCarregando();   // tambem quando nao ha .dat: senao o aviso fica eterno
             return { livros: biblioteca.length, fotos: Object.keys(fotos).length };
+        }
+
+        // ===================================================================
+        // "Selecionar pasta" -- o mesmo fluxo nas quatro plataformas
+        //
+        // Mora num lugar so porque DOIS hospedeiros o usam: o Windows (Tauri)
+        // e, a partir da Etapa 4, o Mac (WKWebView). Duplica-lo recriaria o
+        // problema que esta mudanca existe para resolver -- quatro primeiros
+        // acessos diferentes, divergindo com o tempo.
+        //
+        // Os quatro ramos, e a razao de cada um:
+        //
+        //  A. a pasta TEM biblioteca.txt  -> mostra quantos livros achou e
+        //     confirma. Perguntar "quer usar o arquivo?" sem dizer o que ha
+        //     dentro e pedir um palpite; com a contagem, e respondivel.
+        //  B. a pasta esta VAZIA          -> cria e avisa, sem perguntar. O
+        //     usuario acabou de escolher aquela pasta com essa finalidade.
+        //  C. tem arquivo e nao leu       -> diz o que houve e oferece outra
+        //     pasta. NUNCA cria por cima: pode ser a biblioteca de alguem,
+        //     ilegivel por permissao ou ainda baixando da nuvem.
+        //  D. vazia, mas ha livros abertos -> pergunta. E o unico caso com algo
+        //     a perder, e a resposta muda o que vai para o disco.
+        // ===================================================================
+
+        /// O hospedeiro que sabe escolher pasta, ou null quando nenhum sabe.
+        function pontePasta() {
+            if (window.__TAURI__) {
+                const inv = window.__TAURI__.core.invoke;
+                return {
+                    escolher: () => inv("escolher_pasta"),
+                    olhar: (caminho) => inv("olhar_pasta", { caminho }).then(JSON.parse),
+                    vincular: (caminho) => inv("definir_pasta", { caminho }),
+                    criar: (caminho, conteudo) => inv("criar_na_pasta", { caminho, conteudo }),
+                    recarregar: () => carregarDoTauri(),
+                };
+            }
+            return null;
+        }
+
+        /// Caixa de duas (ou uma) saidas, em Promessa.
+        ///
+        /// Devolve `true` no botao de confirmar, `false` no de recusar e **null**
+        /// quando o usuario fecha sem escolher -- e os tres sao desfechos
+        /// diferentes: fechar NAO pode valer por "nao", porque aqui o "nao"
+        /// escreve no disco.
+        ///
+        /// Nao usa `confirm()` de proposito: no WKWebView do Mac ele nao abre
+        /// nada e devolve false calado. Foi assim que em 12/10/2026 o Remover
+        /// parou de funcionar so no Mac, com a suite de navegador toda verde.
+        function perguntar({ titulo, corpo, confirmar, recusar }) {
+            const fundo = document.getElementById("modal-pasta");
+            const bConf = document.getElementById("btn-pasta-confirmar");
+            const bRec = document.getElementById("btn-pasta-recusar");
+            const bFech = document.getElementById("btn-pasta-fechar");
+            document.getElementById("pasta-titulo").textContent = titulo;
+            const pCorpo = document.getElementById("pasta-corpo");
+            pCorpo.textContent = corpo || "";
+            pCorpo.style.display = corpo ? "" : "none";
+            bConf.textContent = confirmar;
+            bRec.textContent = recusar || "";
+            bRec.style.display = recusar ? "" : "none";
+            fundo.classList.add("active");
+            return new Promise(resolve => {
+                const fechar = (valor) => {
+                    fundo.classList.remove("active");
+                    bConf.onclick = bRec.onclick = bFech.onclick = null;
+                    resolve(valor);
+                };
+                bConf.onclick = () => fechar(true);
+                bRec.onclick = () => fechar(false);
+                bFech.onclick = () => fechar(null);
+            });
+        }
+
+        async function selecionarPasta() {
+            const ponte = pontePasta();
+            if (!ponte) return;
+
+            while (true) {
+                let caminho;
+                try {
+                    caminho = await ponte.escolher();
+                } catch (e) {
+                    toast(t("erroSelecionarPasta", String(e)), 5000);
+                    return;
+                }
+                if (!caminho) return;   // fechou o seletor: nada muda, nada de erro
+
+                const info = await ponte.olhar(caminho);
+
+                // C -- ha arquivo e nao deu para ler.
+                if (info.erro) {
+                    const outra = await perguntar({
+                        titulo: t("naoConsegueLerTitulo"),
+                        corpo: t("naoConsegueLer", info.erro),
+                        confirmar: t("escolherOutraPasta"),
+                    });
+                    if (outra !== true) return;
+                    continue;           // volta ao seletor
+                }
+
+                // A -- ha biblioteca: mostra a contagem e confirma.
+                if (info.temArquivo) {
+                    const quantos = parseTSV(info.conteudo).length;
+                    const usar = await perguntar({
+                        titulo: t("achouBiblioteca"),
+                        corpo: t("achouBibliotecaCorpo", info.nome, quantos),
+                        confirmar: t("usarEstaBiblioteca"),
+                        recusar: t("escolherOutraPasta"),
+                    });
+                    if (usar === null) return;      // fechou a caixa: fica como esta
+                    if (usar === false) continue;   // quer outra pasta
+                    await ponte.vincular(caminho);
+                    // O arquivo achado pode estar VAZIO (0 livros), e
+                    // `carregarDoTauri` so troca a lista quando le algo: os
+                    // livros de antes continuariam na tela, e a primeira
+                    // gravacao os despejaria no arquivo DESTA pasta. Trocamos
+                    // aqui, pelo conteudo que o `olhar_pasta` ja leu -- o mesmo
+                    // texto de onde saiu o numero que o usuario acabou de ver.
+                    biblioteca = parseTSV(info.conteudo);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+                    await ponte.recarregar();
+                    return;
+                }
+
+                // D -- vazia, com livros abertos: a unica pergunta com algo a perder.
+                let levar = false;
+                if (biblioteca.length > 0) {
+                    const resposta = await perguntar({
+                        titulo: t("pastaVaziaComLivros", biblioteca.length),
+                        confirmar: t("levarParaPasta", biblioteca.length),
+                        recusar: t("comecarVazia"),
+                    });
+                    if (resposta === null) return;  // fechou a caixa: nao escreve nada
+                    levar = resposta;
+                }
+
+                // B -- cria, vincula e avisa.
+                try {
+                    await ponte.criar(caminho, levar ? serializarTSV() : "");
+                } catch (e) {
+                    // O arquivo apareceu entre o olhar e o criar: usa o que esta
+                    // la, nunca por cima. Alguns provedores de nuvem baixam
+                    // renomeando e depois trocam os dois arquivos.
+                    if (String(e).includes("ja_existe")) continue;
+                    toast(String(e), 5000);
+                    return;
+                }
+                // So depois de o arquivo existir. Zerar antes e perder a
+                // biblioteca aberta se a criacao falhar.
+                if (!levar) {
+                    biblioteca = [];
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(biblioteca));
+                }
+                await ponte.recarregar();
+                toast(t("criouArquivo", info.nome), 4000);
+                return;
+            }
         }
 
         async function recarregarDoArquivo() {
@@ -6372,6 +6579,7 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
                 desvincularArquivo();
             }
         });
+        document.getElementById("btn-selecionar-pasta").addEventListener("click", selecionarPasta);
         document.getElementById("btn-recarregar").addEventListener("click", recarregarDoArquivo);
         document.getElementById("btn-dat").addEventListener("click", vincularDat);
         document.getElementById("btn-fotos-orfas").addEventListener("click", mostrarFotosOrfas);
