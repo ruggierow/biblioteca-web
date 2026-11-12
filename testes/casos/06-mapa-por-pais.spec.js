@@ -149,7 +149,7 @@ test.describe("Mapa por pais", () => {
 
   test("conta quantos livros ainda estao sem pais", async ({ page }) => {
     await abrirComMapa(page);
-    await expect(page.locator("#mapa-rodape")).toContainText("1 ainda sem pais");
+    await expect(page.locator("#mapa-rodape")).toContainText("1 ainda sem país");
   });
 
   // Um codigo sem posicao no mapa nao pode sumir calado: ele some do desenho,

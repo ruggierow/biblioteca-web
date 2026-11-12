@@ -916,7 +916,7 @@
                 </div>
                 <div class="form-grid">
                     <div>
-                        <label for="titulo" data-i18n="titulo">Titulo</label>
+                        <label for="titulo" data-i18n="titulo">Título</label>
                         <input type="text" id="titulo" required>
                     </div>
                     <div>
@@ -938,12 +938,12 @@
                         <input type="text" id="local" placeholder="Ex.: Estante 3, sala de estudo" data-i18n-attr="placeholder=localExemplarDica">
                     </div>
                     <div>
-                        <label for="pais" data-i18n="paisOpcional">Pais (opcional)</label>
+                        <label for="pais" data-i18n="paisOpcional">País (opcional)</label>
                         <select id="pais"></select>
                     </div>
                     <div class="campo-largo">
-                        <label for="comentarios" data-i18n="comentariosOpcional">Comentarios (opcional)</label>
-                        <textarea id="comentarios" rows="3" placeholder="Anotacoes pessoais, resumo, observacoes..." data-i18n-attr="placeholder=comentariosDica"></textarea>
+                        <label for="comentarios" data-i18n="comentariosOpcional">Comentários (opcional)</label>
+                        <textarea id="comentarios" rows="3" placeholder="Anotações pessoais, resumo, observações..." data-i18n-attr="placeholder=comentariosDica"></textarea>
                     </div>
                     <div class="campo-largo">
                         <label data-i18n="gruposLiteratura">Grupos de Literatura</label>
@@ -983,7 +983,7 @@
             <h2 data-i18n="pesquisarEFiltrar">Pesquisar e filtrar</h2>
             <div class="toolbar">
                 <div class="field">
-                    <label for="filtro-titulo" data-i18n="tituloParcial">Titulo (parcial)</label>
+                    <label for="filtro-titulo" data-i18n="tituloParcial">Título (parcial)</label>
                     <input type="text" id="filtro-titulo" placeholder="Ex.: dom casm" data-i18n-attr="placeholder=tituloParcialDica">
                 </div>
                 <div class="field">
@@ -1002,7 +1002,7 @@
                     <label for="filtro-status" data-i18n="status">Status</label>
                     <select id="filtro-status">
                         <option value="todos" data-i18n="todos">Todos</option>
-                        <option value="disponivel" data-i18n="disponiveis">Disponiveis</option>
+                        <option value="disponivel" data-i18n="disponiveis">Disponíveis</option>
                         <option value="emprestado" data-i18n="emprestados">Emprestados</option>
                     </select>
                 </div>
@@ -1028,11 +1028,11 @@
         <section class="card no-print">
             <h2 data-i18n="editarLivro">Editar livro</h2>
             <p style="margin:0 0 12px; color: var(--muted); font-size: 13px;">
-                <span data-i18n-html="editarAjuda">Selecione um livro para corrigir um cadastro com erro. Voce tambem pode clicar em <strong>Editar</strong> na linha do livro na tabela abaixo.</span>
+                <span data-i18n-html="editarAjuda">Selecione um livro para corrigir um cadastro com erro. Você também pode clicar em <strong>Editar</strong> na linha do livro na tabela abaixo.</span>
             </p>
             <div class="toolbar">
                 <div class="field" style="flex: 2;">
-                    <label for="edit-busca" data-i18n="filtrarListaPor">Filtrar lista por titulo, autor ou tema</label>
+                    <label for="edit-busca" data-i18n="filtrarListaPor">Filtrar lista por título, autor ou tema</label>
                     <input type="text" id="edit-busca" placeholder="Digite para filtrar a lista..." data-i18n-attr="placeholder=filtrarListaDica">
                 </div>
                 <div class="field" style="flex: 3;">
@@ -1070,12 +1070,11 @@
         <section class="card no-print">
             <details class="retratil" id="secao-mapa">
                 <summary>
-                    <span data-i18n="mapaPorPais">Mapa por pais</span>
+                    <span data-i18n="mapaPorPais">Mapa por país</span>
                     <span class="indicador">&#9662;</span>
                 </summary>
                 <p style="margin:12px 0; color: var(--muted); font-size: 13px;">
-                    <span data-i18n="mapaAjuda">Cada bolha e um pais, no lugar dele no mundo, e o tamanho e quantos
-                    livros voce tem de la. Clique numa bolha para filtrar a lista.</span>
+                    <span data-i18n="mapaAjuda">Cada bolha é um país, no lugar dele no mundo, e o tamanho é quantos livros você tem de lá. Clique numa bolha para filtrar a lista.</span>
                 </p>
                 <svg id="mapa-svg" viewBox="0 0 360 165" role="img" aria-label="Mapa do acervo por pais" data-i18n-attr="aria-label=mapaAria"></svg>
                 <div class="mapa-rodape" id="mapa-rodape"></div>
@@ -1086,13 +1085,11 @@
         <section class="card no-print">
             <details class="retratil">
                 <summary>
-                    <span data-i18n="recuperacaoEmergencia">Recuperacao de emergencia (backup JSON)</span>
+                    <span data-i18n="recuperacaoEmergencia">Recuperação de emergência (backup JSON)</span>
                     <span class="indicador">&#9662;</span>
                 </summary>
                 <p style="margin:12px 0; color: var(--muted); font-size: 13px;">
-                    <span data-i18n-html="recuperacaoAjuda">Use esta secao se voce precisa recuperar livros a partir de um backup JSON
-                    (por exemplo, o valor da chave <code>biblioteca-livros</code> no localStorage),
-                    ou salvar uma copia de seguranca em formato JSON.</span>
+                    <span data-i18n-html="recuperacaoAjuda">Use esta seção se você precisa recuperar livros a partir de um backup JSON (por exemplo, o valor da chave <code>biblioteca-livros</code> no localStorage), ou salvar uma cópia de segurança em formato JSON.</span>
                 </p>
                 <div class="button-row">
                     <button type="button" id="btn-backup-json" class="btn-accent" data-i18n="baixarBackupJson">Baixar backup JSON</button>
@@ -1118,14 +1115,13 @@
                 <span id="sync-mensagem" data-i18n="inicializando">Inicializando...</span>
             </div>
             <p style="margin:0 0 12px; color: var(--muted); font-size: 13px;">
-                <span id="ajuda-arquivo" data-i18n-html="vincularAjuda">Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente.
-                Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.</span>
+                <span id="ajuda-arquivo" data-i18n-html="vincularAjuda">Vincule um arquivo <code>biblioteca.txt</code> para que cada alteração seja gravada nele automaticamente. Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma cópia.</span>
             </p>
             <div class="button-row">
                 <button type="button" id="btn-selecionar-pasta" class="btn-primary" style="display:none;" title="Onde o seu biblioteca.txt esta - ou vai ficar" data-i18n="selecionarPasta" data-i18n-attr="title=selecionarPastaDica">Selecionar pasta</button>
                 <button type="button" id="btn-vincular" class="btn-primary" data-i18n="vincularPasta">Vincular pasta</button>
                 <button type="button" id="btn-dat" class="btn-ghost" style="display:none;" title="Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos" data-i18n="vincularFotos" data-i18n-attr="title=vincularFotosDica">Vincular fotos (.dat)</button>
-                <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca" data-i18n="fotosOrfas" data-i18n-attr="title=fotosOrfasDica">Fotos orfas</button>
+                <button type="button" id="btn-fotos-orfas" class="btn-ghost" style="display:none;" title="Ver fotos sem livro correspondente na biblioteca" data-i18n="fotosOrfas" data-i18n-attr="title=fotosOrfasDica">Fotos órfãs</button>
                 <button type="button" id="btn-desvincular" class="btn-ghost" style="display:none;" data-i18n="desvincular">Desvincular</button>
                 <button type="button" id="btn-recarregar" class="btn-ghost" style="display:none;" title="Reler o arquivo biblioteca.txt vinculado e atualizar a lista" data-i18n-html="recarregar" data-i18n-attr="title=recarregarDica">&#8635; Recarregar</button>
                 <button type="button" id="btn-lojas" class="btn-ghost" style="display:none;" title="Procurar no Kindle e no Audible livros que ainda nao estao aqui" data-i18n-html="atualizarLojas" data-i18n-attr="title=atualizarLojasDica">&#9662; Atualizar do Kindle e do Audible</button>
@@ -1200,7 +1196,7 @@
                     <div>
                         <label for="edit-emprestado" data-i18n="status">Status</label>
                         <select id="edit-emprestado">
-                            <option value="0" data-i18n="disponivel">Disponivel</option>
+                            <option value="0" data-i18n="disponivel">Disponível</option>
                             <option value="1" data-i18n="emprestado">Emprestado</option>
                         </select>
                     </div>
@@ -1259,7 +1255,7 @@
                 <h3 style="margin:0; font-size:16px; color:#1e3a5f;" data-i18n="fotosSemLivro">Fotos sem livro</h3>
                 <button type="button" class="btn-ghost" id="btn-fechar-fotos-orfas">&#10005;</button>
             </div>
-            <p style="font-size:12px; color:#6b7280; margin:0 0 14px; line-height:1.5;" data-i18n="fotosOrfasAjuda">O codigo abaixo de cada foto e o identificador derivado de titulo + autores. Essas fotos existem no arquivo .dat mas nao correspondem a nenhum livro na biblioteca atual.</p>
+            <p style="font-size:12px; color:#6b7280; margin:0 0 14px; line-height:1.5;" data-i18n="fotosOrfasAjuda">O código abaixo de cada foto é o identificador derivado de título + autores. Essas fotos existem no arquivo .dat mas não correspondem a nenhum livro na biblioteca atual.</p>
             <div id="fotos-orfas-lista" style="max-height:380px; overflow-y:auto; display:flex; flex-direction:column; gap:8px;"></div>
             <div style="margin-top:16px; display:flex; gap:8px; justify-content:flex-end;">
                 <button type="button" id="btn-excluir-todas-orfas" class="btn-ghost" style="color:#dc2626;" data-i18n="excluirTodas">Excluir todas</button>
@@ -1271,7 +1267,7 @@
     <div id="modal-grupos" style="display:none; position:fixed; inset:0; background:rgba(20,30,60,0.55); z-index:9010; align-items:center; justify-content:center; padding:20px;">
         <div style="background:#fff; border-radius:12px; padding:24px; max-width:420px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
             <h3 style="margin:0 0 4px; font-size:16px; color:#1e3a5f;" data-i18n="gruposLiteratura">Grupos de Literatura</h3>
-            <p style="margin:0 0 14px; font-size:12px; color:#6b7280;" data-i18n="editeOsNomes">Edite os nomes ou adicione novos grupos. O Grupo 1 nao pode ser removido.</p>
+            <p style="margin:0 0 14px; font-size:12px; color:#6b7280;" data-i18n="editeOsNomes">Edite os nomes ou adicione novos grupos. O Grupo 1 não pode ser removido.</p>
             <div id="lista-grupos-modal" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;"></div>
             <button type="button" id="btn-adicionar-grupo" class="btn-ghost" style="margin-top:12px;width:100%;" data-i18n="adicionarGrupo">+ Adicionar grupo</button>
             <div style="margin-top:16px; text-align:right;">
@@ -1399,7 +1395,7 @@
             cadastrarLivro: "Cadastrar livro",
             isbnDica: "ISBN (10 ou 13 dígitos)",
             buscarIsbn: "Buscar ISBN",
-            titulo: "Titulo",
+            titulo: "Título",
             autores: "Autor(es)",
             adicionarAutor: "+ Adicionar autor",
             temasRotulo: "Tema(s)",
@@ -1407,9 +1403,9 @@
             ano: "Ano",
             localExemplar: "Local do exemplar",
             localExemplarDica: "Ex.: Estante 3, sala de estudo",
-            paisOpcional: "Pais (opcional)",
-            comentariosOpcional: "Comentarios (opcional)",
-            comentariosDica: "Anotacoes pessoais, resumo, observacoes...",
+            paisOpcional: "País (opcional)",
+            comentariosOpcional: "Comentários (opcional)",
+            comentariosDica: "Anotações pessoais, resumo, observações...",
             gruposLiteratura: "Grupos de Literatura",
             livroDiscutidoEmGrupo: "Livro discutido em grupo de literatura",
             gerenciarGrupos: "Gerenciar grupos...",
@@ -1423,7 +1419,7 @@
 
             // --- pesquisa e filtros ---
             pesquisarEFiltrar: "Pesquisar e filtrar",
-            tituloParcial: "Titulo (parcial)",
+            tituloParcial: "Título (parcial)",
             tituloParcialDica: "Ex.: dom casm",
             autorParcial: "Autor (parcial)",
             autorParcialDica: "Ex.: machado",
@@ -1433,7 +1429,7 @@
             localParcialDica: "Ex.: estante 3",
             status: "Status",
             todos: "Todos",
-            disponiveis: "Disponiveis",
+            disponiveis: "Disponíveis",
             emprestados: "Emprestados",
             grupoDeLiteratura: "Grupo de literatura",
             todosOsLivros: "Todos os livros",
@@ -1446,8 +1442,8 @@
 
             // --- editar livro ---
             editarLivro: "Editar livro",
-            editarAjuda: "Selecione um livro para corrigir um cadastro com erro. Voce tambem pode clicar em <strong>Editar</strong> na linha do livro na tabela abaixo.",
-            filtrarListaPor: "Filtrar lista por titulo, autor ou tema",
+            editarAjuda: "Selecione um livro para corrigir um cadastro com erro. Você também pode clicar em <strong>Editar</strong> na linha do livro na tabela abaixo.",
+            filtrarListaPor: "Filtrar lista por título, autor ou tema",
             filtrarListaDica: "Digite para filtrar a lista...",
             livroAEditar: "Livro a editar",
             editarSelecionado: "Editar selecionado",
@@ -1461,13 +1457,13 @@
             filtrarAutores: "Filtrar autores…",
 
             // --- mapa ---
-            mapaPorPais: "Mapa por pais",
-            mapaAjuda: "Cada bolha e um pais, no lugar dele no mundo, e o tamanho e quantos livros voce tem de la. Clique numa bolha para filtrar a lista.",
-            mapaAria: "Mapa do acervo por pais",
+            mapaPorPais: "Mapa por país",
+            mapaAjuda: "Cada bolha é um país, no lugar dele no mundo, e o tamanho é quantos livros você tem de lá. Clique numa bolha para filtrar a lista.",
+            mapaAria: "Mapa do acervo por país",
 
             // --- backup JSON ---
-            recuperacaoEmergencia: "Recuperacao de emergencia (backup JSON)",
-            recuperacaoAjuda: "Use esta secao se voce precisa recuperar livros a partir de um backup JSON (por exemplo, o valor da chave <code>biblioteca-livros</code> no localStorage), ou salvar uma copia de seguranca em formato JSON.",
+            recuperacaoEmergencia: "Recuperação de emergência (backup JSON)",
+            recuperacaoAjuda: "Use esta seção se você precisa recuperar livros a partir de um backup JSON (por exemplo, o valor da chave <code>biblioteca-livros</code> no localStorage), ou salvar uma cópia de segurança em formato JSON.",
             baixarBackupJson: "Baixar backup JSON",
             verLocalStorage: "Ver localStorage atual",
             coleOJson: "Cole aqui o JSON do backup (array de livros) e clique em Restaurar:",
@@ -1477,12 +1473,12 @@
             // --- arquivo ---
             arquivoBiblioteca: "Arquivo biblioteca.txt",
             inicializando: "Inicializando...",
-            vincularAjuda: "Vincule um arquivo <code>biblioteca.txt</code> para que cada alteracao seja gravada nele automaticamente. Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma copia.",
+            vincularAjuda: "Vincule um arquivo <code>biblioteca.txt</code> para que cada alteração seja gravada nele automaticamente. Em navegadores sem suporte (Safari/Firefox), use Exportar para baixar uma cópia.",
             // No aplicativo instalado a frase acima e falsa duas vezes: nao ha o
             // que "vincular" (o arquivo ja esta ligado) e nao ha navegador sem
             // suporte. Ela aparecia assim mesmo, no Mac e no Windows, inclusive
             // nas figuras do manual.
-            vincularAjudaApp: "O seu <code>biblioteca.txt</code> e gravado a cada alteracao. Use <b>Selecionar pasta</b> para escolher em que pasta ele fica.",
+            vincularAjudaApp: "O seu <code>biblioteca.txt</code> é gravado a cada alteração. Use <b>Selecionar pasta</b> para escolher em que pasta ele fica.",
             vincularPasta: "Vincular pasta",
 
             // --- selecionar pasta: o mesmo primeiro acesso das quatro plataformas ---
@@ -1501,13 +1497,13 @@
             erroSelecionarPasta: "Não foi possível abrir o seletor de pastas: ${0}",
             vincularFotos: "Vincular fotos (.dat)",
             vincularFotosDica: "Vincular biblioteca.dat para sincronizar fotos de capa com outros dispositivos",
-            fotosOrfas: "Fotos orfas",
+            fotosOrfas: "Fotos órfãs",
             fotosOrfasDica: "Ver fotos sem livro correspondente na biblioteca",
             desvincular: "Desvincular",
             recarregar: "&#8635; Recarregar",
             recarregarDica: "Reler o arquivo biblioteca.txt vinculado e atualizar a lista",
             atualizarLojas: "&#9662; Atualizar do Kindle e do Audible",
-            atualizarLojasDica: "Procurar no Kindle e no Audible livros que ainda nao estao aqui",
+            atualizarLojasDica: "Procurar no Kindle e no Audible livros que ainda não estão aqui",
             importarAvulso: "Importar (avulso)",
             importarExcel: "Importar Excel (Grupo Literatura)",
             exportarAvulso: "Exportar (avulso)",
@@ -1526,17 +1522,17 @@
 
             // --- janela de edicao ---
             salvar: "Salvar",
-            disponivel: "Disponivel",
+            disponivel: "Disponível",
             emprestado: "Emprestado",
 
             // --- fotos orfas ---
             fotosSemLivro: "Fotos sem livro",
-            fotosOrfasAjuda: "O codigo abaixo de cada foto e o identificador derivado de titulo + autores. Essas fotos existem no arquivo .dat mas nao correspondem a nenhum livro na biblioteca atual.",
+            fotosOrfasAjuda: "O código abaixo de cada foto é o identificador derivado de título + autores. Essas fotos existem no arquivo .dat mas não correspondem a nenhum livro na biblioteca atual.",
             excluirTodas: "Excluir todas",
             fechar: "Fechar",
 
             // --- janela de grupos ---
-            editeOsNomes: "Edite os nomes ou adicione novos grupos. O Grupo 1 nao pode ser removido.",
+            editeOsNomes: "Edite os nomes ou adicione novos grupos. O Grupo 1 não pode ser removido.",
             adicionarGrupo: "+ Adicionar grupo",
 
             // --- primeiro uso ---
@@ -1559,32 +1555,32 @@
 
             // --- mensagens que o codigo monta ---
             fotosNaoCabem: "As fotos não cabem mais no armazenamento do navegador. Use “Vincular fotos (.dat)” para guardá-las num arquivo.",
-            tituloCopiado: "Titulo copiado: ${0} — cole na busca do Kindle.",
-            naoCopiouTitulo: "Nao foi possivel copiar o titulo.",
-            naoAbriuEndereco: "Nao foi possivel abrir este endereco.",
+            tituloCopiado: "Título copiado: ${0} — cole na busca do Kindle.",
+            naoCopiouTitulo: "Não foi possível copiar o título.",
+            naoAbriuEndereco: "Não foi possível abrir este endereço.",
             cargaDemorou: "A carga demorou mais que o esperado. Se faltar capa, use Recarregar.",
             fotosImportadasDat: "${0} foto(s) importada(s) do .dat.",
-            datVazio: "Dat vazio — ${0} foto(s) existente(s) serao gravadas nele.",
+            datVazio: "Dat vazio — ${0} foto(s) existente(s) serão gravadas nele.",
             livrosEFotos: "${0} livro(s) · ${1}",
             fotosDoDat: "${0} foto(s) do .dat.",
             fotosVinculadas: "Fotos vinculadas. ${0}",
             erroVincularFotos: "Erro ao vincular arquivo de fotos.",
-            pedidoDePermissao: "O navegador vai pedir permissao para EDITAR o arquivo — clique em \"Save changes\" (Permitir). Isso nao apaga nada.",
-            semVinculacaoDireta: "Seu navegador nao suporta vinculacao direta.",
-            permissaoEscritaNegada: "Permissao de escrita negada.",
+            pedidoDePermissao: "O navegador vai pedir permissão para EDITAR o arquivo — clique em \"Save changes\" (Permitir). Isso não apaga nada.",
+            semVinculacaoDireta: "Seu navegador não suporta vinculação direta.",
+            permissaoEscritaNegada: "Permissão de escrita negada.",
             trocaCancelada: "Troca cancelada. Arquivo anterior mantido.",
             livrosCarregadosDoArquivo: "${0} livro(s) carregado(s) do arquivo.",
             erroLerVinculado: "Erro ao ler o arquivo vinculado.",
             arquivoVinculadoGravado: "Arquivo vinculado. Lista atual gravada nele.",
-            semSelecaoNesteContexto: "Seu navegador nao permite selecionar arquivo neste contexto. Use Importar para carregar o arquivo.",
+            semSelecaoNesteContexto: "Seu navegador não permite selecionar arquivo neste contexto. Use Importar para carregar o arquivo.",
             erroVincularArquivo: "Erro ao vincular arquivo.",
-            naoAbriuSeletorPastas: "Nao foi possivel abrir o seletor de pastas.",
-            semBibliotecaNaPasta: "Nao ha um biblioteca.txt nesta pasta. Escolha a pasta onde o arquivo esta.",
+            naoAbriuSeletorPastas: "Não foi possível abrir o seletor de pastas.",
+            semBibliotecaNaPasta: "Não há um biblioteca.txt nesta pasta. Escolha a pasta onde o arquivo está.",
             selecioneParaReautorizar: "Selecione o arquivo biblioteca.txt para reautorizar.",
-            permissaoNaoConcedida: "Permissao nao concedida.",
+            permissaoNaoConcedida: "Permissão não concedida.",
             selecioneDatParaReautorizar: "Selecione o arquivo de fotos (.dat) para reautorizar.",
-            permissaoReativadaComLivros: "Permissao reativada — ${0} livro(s).${1}",
-            permissaoReativada: "Permissao reativada.",
+            permissaoReativadaComLivros: "Permissão reativada — ${0} livro(s).${1}",
+            permissaoReativada: "Permissão reativada.",
             arquivoDesvinculado: "Arquivo desvinculado.",
             fotosNaoLidas: "As fotos não puderam ser lidas do arquivo.",
             recarregandoICloud: "Recarregando do iCloud…",
@@ -1597,18 +1593,18 @@
             erroGravarTxt: "Erro ao gravar biblioteca.txt: ${0}",
             fotosNaoGravadas: "Fotos não gravadas — ${0}",
             escolhaLivroParaEditar: "Escolha um livro na lista para editar.",
-            lojasSoNoMac: "As bibliotecas do Kindle e do Audible so podem ser lidas no Mac.",
-            titulosAcrescentados: "${0} titulo(s) acrescentado(s).",
+            lojasSoNoMac: "As bibliotecas do Kindle e do Audible só podem ser lidas no Mac.",
+            titulosAcrescentados: "${0} título(s) acrescentado(s).",
             capasKindleGravadas: "${0} capa(s) do Kindle gravada(s).",
-            grupoAtribuido: "Este grupo esta atribuido a ${0} livro(s). Remover mesmo assim?",
+            grupoAtribuido: "Este grupo está atribuído a ${0} livro(s). Remover mesmo assim?",
             preenchaTodosCampos: "Preencha todos os campos (pelo menos um autor e um tema).",
-            cadastroRecusado: "Cadastro recusado: ja existe um livro identico.",
-            edicaoRecusada: "Edicao recusada: a alteracao deixaria este livro identico a outro ja cadastrado.",
-            fichaDoLivro: "Titulo: ${0}\nAutor(es): ${1}\nAno: ${2}",
+            cadastroRecusado: "Cadastro recusado: já existe um livro idêntico.",
+            edicaoRecusada: "Edição recusada: a alteração deixaria este livro idêntico a outro já cadastrado.",
+            fichaDoLivro: "Título: ${0}\nAutor(es): ${1}\nAno: ${2}",
             linhaSimilar: "  • \"${0}\" — ${1} (${2}) [${3}% similar]",
             maisAlguns: "\n  ... e mais ${0}",
-            confirmarParecidos: "Atencao: encontramos ${0} livro(s) parecido(s):\n\n${1}\n\nCadastrar mesmo assim?",
-            confirmarParecidosEdicao: "Atencao: depois desta alteracao, o livro ficara parecido com:\n\n${0}\n\nSalvar mesmo assim?",
+            confirmarParecidos: "Atenção: encontramos ${0} livro(s) parecido(s):\n\n${1}\n\nCadastrar mesmo assim?",
+            confirmarParecidosEdicao: "Atenção: depois desta alteração, o livro ficará parecido com:\n\n${0}\n\nSalvar mesmo assim?",
             livroCadastrado: "Livro cadastrado com sucesso.",
             erroProcessarImagem: "Erro ao processar a imagem.",
             livrosEncontrados: "${0} livro(s) encontrado(s).",
@@ -1619,11 +1615,11 @@
             informeAutor: "Informe pelo menos um autor.",
             informeTema: "Informe pelo menos um tema.",
             livroAtualizado: "Livro atualizado.",
-            naoImprimiu: "Nao foi possivel imprimir.",
+            naoImprimiu: "Não foi possível imprimir.",
             nenhumResultadoImprimir: "Nenhum resultado para imprimir.",
             nenhumResultadoExportar: "Nenhum resultado para exportar.",
-            naoSalvouPlanilha: "Nao foi possivel salvar a planilha.",
-            nenhumLivroValidoNoArquivo: "Nenhum livro valido encontrado no arquivo.",
+            naoSalvouPlanilha: "Não foi possível salvar a planilha.",
+            nenhumLivroValidoNoArquivo: "Nenhum livro válido encontrado no arquivo.",
             confirmarImportar: "Importar ${0} livro(s)? OK substitui a lista atual, Cancelar adiciona ao final.",
             livrosImportados: "${0} livro(s) importado(s).",
             erroLerArquivo: "Erro ao ler o arquivo.",
@@ -1636,7 +1632,7 @@
             nenhumaFotoChrome: "Nenhuma foto encontrada no Chrome.",
             erroCom: "Erro: ${0}",
             arquivoSalvo: "Arquivo ${0} salvo (${1} livro(s)).",
-            naoSalvouAntesEncerrar: "Atencao: nao foi possivel salvar o arquivo antes de encerrar.",
+            naoSalvouAntesEncerrar: "Atenção: não foi possível salvar o arquivo antes de encerrar.",
             confirmarEncerrar: "Encerrar a interface?",
             confirmarApagarTudo: "Apagar TODOS os livros da lista? Esta ação não pode ser desfeita.",
             confirmarApagarTudo2: "Tem certeza? Todos os cadastros serão removidos.",
@@ -1650,21 +1646,21 @@
             backupJsonBaixado: "Backup JSON baixado.",
             nadaNoLocalStorage: "Nada no localStorage para esta chave.",
             localStorageTem: "localStorage tem ${0} livro(s).",
-            conteudoLocalStorage: "Conteudo do localStorage carregado (formato bruto).",
+            conteudoLocalStorage: "Conteúdo do localStorage carregado (formato bruto).",
             coleOJsonAntes: "Cole o JSON antes de restaurar.",
-            jsonInvalido: "JSON invalido: ${0}",
+            jsonInvalido: "JSON inválido: ${0}",
             jsonPrecisaArray: "O JSON precisa ser um array de livros.",
-            nenhumLivroValido: "Nenhum livro valido encontrado.",
+            nenhumLivroValido: "Nenhum livro válido encontrado.",
             restauradosMsg: "Restaurados ${0} livro(s). Total agora: ${1}.",
-            confirmarDesvincular: "Desvincular biblioteca.txt? As alteracoes seguintes nao serao mais gravadas no arquivo.",
-            confirmarSubstituirFoto: "Este livro ja tem uma foto. Substituir?",
+            confirmarDesvincular: "Desvincular biblioteca.txt? As alterações seguintes não serão mais gravadas no arquivo.",
+            confirmarSubstituirFoto: "Este livro já tem uma foto. Substituir?",
             livrosEFotosCarregados: "${0} livro(s) e ${1} foto(s) carregado(s).",
             erroTauri: "Erro Tauri: ${0}",
 
             // --- tabela e paginacao ---
             mostrandoTotal: "Mostrando ${0} livro(s)",
             anteriorPagina: "&laquo; Anterior",
-            proximaPagina: "Proxima &raquo;",
+            proximaPagina: "Próxima &raquo;",
             mostrandoFaixa: "Mostrando ${0}-${1} de ${2}",
             contadorDeTotal: "${0} de ${1} livro(s)",
             nenhumLivroCadastrado: "Nenhum livro cadastrado.",
@@ -1672,15 +1668,15 @@
             cliqueParaEditar: "Clique para editar",
             semFotoClique: "Sem foto — clique para adicionar",
             colFoto: "Foto",
-            colTitulo: "Titulo",
+            colTitulo: "Título",
             colAutor: "Autor",
             colTema: "Tema",
             colAno: "Ano",
             colStatus: "Status",
             colLocal: "Local",
-            colComentario: "Comentario",
+            colComentario: "Comentário",
             colGrupo: "Grupo",
-            colAcoes: "Acoes",
+            colAcoes: "Ações",
             grupoLiteraturaDica: "Grupo de Literatura",
             acEditar: "Editar",
             acDevolver: "Devolver",
@@ -1690,45 +1686,45 @@
 
             // --- faixa de sincronizacao, listas e janelas montadas por codigo ---
             botaoFotos: "Fotos: ${0}",
-            nenhumaFotoOrfa: "Nenhuma foto orfa encontrada.",
-            orfasExcluidas: "${0} foto(s) orfa(s) excluida(s).",
+            nenhumaFotoOrfa: "Nenhuma foto órfã encontrada.",
+            orfasExcluidas: "${0} foto(s) órfã(s) excluída(s).",
             opcaoLivro: "— livro —",
             arquivoComCaminho: "Arquivo: ${0} — alterações salvas automaticamente.",
             sincronizadoICloud: "Sincronizado com iCloud Drive — alterações salvas automaticamente.",
             arquivoSo: "Arquivo: ${0}",
             gravadoEm: " — gravado em ${0}",
-            haDias: " (ha ${0} dias)",
+            haDias: " (há ${0} dias)",
             salvasAutomaticamente: " — alterações salvas automaticamente.",
             pastaInacessivel: "ATENÇÃO: a pasta configurada (${0}) não está acessível. Lendo de ${1}, que pode ser outra biblioteca. ",
             sincronizado: "Sincronizado — alterações salvas automaticamente.",
-            lembreSeImportar: "&#9888;&#65039; <strong>Lembre-se:</strong> antes de iniciar, use <strong>Importar</strong> para carregar a versao atual do <code>biblioteca.txt</code>. Ao terminar, use <strong>Exportar</strong> para salvar as alteracoes.",
-            caminhoNaoRevelado: "Por seguranca, o navegador nao revela o caminho completo do arquivo.",
+            lembreSeImportar: "&#9888;&#65039; <strong>Lembre-se:</strong> antes de iniciar, use <strong>Importar</strong> para carregar a versão atual do <code>biblioteca.txt</code>. Ao terminar, use <strong>Exportar</strong> para salvar as alterações.",
+            caminhoNaoRevelado: "Por segurança, o navegador não revela o caminho completo do arquivo.",
             umLivro: "livro",
             variosLivros: "livros",
             sincronizadoCom: "Sincronizado com ${0} · ${1} ${2}",
-            alteracoesSalvas: "${0} — alteracoes salvas automaticamente.",
-            comDataETamanho: "${0} · atualizado ${1} · ${2} KB — alteracoes salvas automaticamente.",
-            permissaoExpirou: "Arquivo <span class=\"arquivo-info\">${0}</span> vinculado, mas a permissao expirou. Clique em <strong>Reativar</strong>.",
-            reativarPermissao: "Reativar permissao",
-            semArquivoVinculado: "Nenhum arquivo vinculado. As alteracoes ficam apenas no navegador ate voce exportar ou vincular.",
+            alteracoesSalvas: "${0} — alterações salvas automaticamente.",
+            comDataETamanho: "${0} · atualizado ${1} · ${2} KB — alterações salvas automaticamente.",
+            permissaoExpirou: "Arquivo <span class=\"arquivo-info\">${0}</span> vinculado, mas a permissão expirou. Clique em <strong>Reativar</strong>.",
+            reativarPermissao: "Reativar permissão",
+            semArquivoVinculado: "Nenhum arquivo vinculado. As alterações ficam apenas no navegador até você exportar ou vincular.",
             arquivoDaBiblioteca: "Arquivo da biblioteca",
             arquivoDeTexto: "Arquivo de texto",
-            arquivoSubstituiLista: "O arquivo escolhido tem ${0} livro(s); a lista exibida sera substituida por ele.\nSuas alteracoes atuais ja estao salvas no arquivo anterior.",
-            arquivoOuMemoria: "O arquivo escolhido tem ${0} livro(s). A lista atual na memoria tem ${1}.\n\nOK = USAR o arquivo (${0}) e descartar a lista da memoria.\nCancelar = GRAVAR sua lista (${1}) POR CIMA do arquivo, substituindo o conteudo dele.",
+            arquivoSubstituiLista: "O arquivo escolhido tem ${0} livro(s); a lista exibida será substituída por ele.\nSuas alterações atuais já estão salvas no arquivo anterior.",
+            arquivoOuMemoria: "O arquivo escolhido tem ${0} livro(s). A lista atual na memória tem ${1}.\n\nOK = USAR o arquivo (${0}) e descartar a lista da memória.\nCancelar = GRAVAR sua lista (${1}) POR CIMA do arquivo, substituindo o conteúdo dele.",
             lendoListaDeLivros: "Lendo a lista de livros.",
             carregandoCapas: "Carregando as capas dos livros. Isto leva alguns segundos.",
             nenhumTemaEncontrado: "Nenhum tema encontrado.",
             nenhumAutorEncontrado: "Nenhum autor encontrado.",
-            opcaoSemPais: "— sem pais —",
+            opcaoSemPais: "— sem país —",
             paisComLivros: "${0}: ${1} livro(s)",
-            rodapeMapa: "${0} livro(s) com pais em ${1} pais(es) &middot; ${2} ainda sem pais",
+            rodapeMapa: "${0} livro(s) com país em ${1} país(es) &middot; ${2} ainda sem país",
             nenhumLivroNaLista: "Nenhum livro encontrado",
-            jaTemParecido: "voce ja tem \"${0}\" em ${1} — esta entra como a edicao Kindle",
+            jaTemParecido: "você já tem \"${0}\" em ${1} — esta entra como a edição Kindle",
             semAutor: "sem autor",
             semLocal: "sem local",
-            nadaAcrescentarDe: "Nada a acrescentar: dos ${0} titulo(s) nas lojas, todos ja estao aqui ou voce ainda nao os adquiriu.",
+            nadaAcrescentarDe: "Nada a acrescentar: dos ${0} título(s) nas lojas, todos já estão aqui ou você ainda não os adquiriu.",
             nadaAcrescentar: "Nada a acrescentar.",
-            resumoDasLojas: "<strong>${0}</strong> titulo(s) ainda nao estao na biblioteca. Os do Kindle entram como <em>local: Kindle</em>, os do Audible como <em>local: ${1}</em>. O que voce ja tem catalogado empresta tema e pais; o resto voce preenche depois.",
+            resumoDasLojas: "<strong>${0}</strong> título(s) ainda não estão na biblioteca. Os do Kindle entram como <em>local: Kindle</em>, os do Audible como <em>local: ${1}</em>. O que você já tem catalogado empresta tema e país; o resto você preenche depois.",
             isbnNaoEncontrado: "ISBN não encontrado em nenhuma base de dados.",
             erroAoBuscar: "Erro ao buscar. Verifique a conexão com a internet.",
             grupoNumero: "Grupo ${0}",
@@ -1741,8 +1737,8 @@
             arquivoAtualizado: "Arquivo atualizado: ${0} livro(s) carregado(s) (antes: ${1}).",
             naSuaBiblioteca: " · na sua biblioteca",
             inclusoNoPlano: " · incluso no plano",
-            jaTemAudiolivro: "voce ja tem \"${0}\" em ${1} — esta entra como o audiolivro",
-            anoDoAudiolivro: "nao esta na sua biblioteca ainda, entao o ano e o do AUDIOLIVRO — confira",
+            jaTemAudiolivro: "você já tem \"${0}\" em ${1} — esta entra como o audiolivro",
+            anoDoAudiolivro: "não está na sua biblioteca ainda, então o ano é o do AUDIOLIVRO — confira",
             foraDaTabela: "${0} (fora da tabela)",
             trocarParaEsteArquivo: "Trocar para este arquivo?\n\n",
             contadorCategorias: "${0} tema(s), ${1} autor(es)",
@@ -1750,14 +1746,14 @@
 
             // --- ficha de impressao, relatorio e planilha ---
             fichaDoCadastro: "Cadastro do Livro",
-            fichaComentarios: "Comentarios",
-            fichaSemGrupo: "Nao",
+            fichaComentarios: "Comentários",
+            fichaSemGrupo: "Não",
             qualquerGrupoLiteratura: "Qualquer grupo de literatura",
-            relatorioDeLivros: "Relatorio de Livros",
+            relatorioDeLivros: "Relatório de Livros",
             geradoEm: "Gerado em: ${0}",
             totalDeLivros: "Total de livros: ",
             filtrosAplicados: "Filtros aplicados:",
-            rodapeDoRelatorio: "Biblioteca &mdash; Relatorio gerado automaticamente",
+            rodapeDoRelatorio: "Biblioteca &mdash; Relatório gerado automaticamente",
             registros: "${0} registro(s)",
             resultadosDaPesquisa: "Resultados da pesquisa",
             abaResultados: "Resultados",

@@ -107,7 +107,7 @@ test.describe("Idioma", () => {
 
   test("trocar para ingles redesenha a lista ja na tela", async ({ page }) => {
     await abrir(page, [livro("Qualquer Livro")]);
-    await expect(page.locator(".status-pill").first()).toHaveText("Disponivel");
+    await expect(page.locator(".status-pill").first()).toHaveText("Disponível");
     await page.selectOption("#seletor-idioma", "en");
     // Nao basta trocar o que esta escrito no HTML: a tabela e montada por
     // codigo e precisa ser redesenhada.
@@ -169,20 +169,32 @@ test.describe("Idioma", () => {
       });
     }
 
+    /**
+     * O texto como ele aparece DENTRO do .xlsx.
+     *
+     * A planilha e um zip, e por isso a lemos byte a byte (latin1) — ler como
+     * UTF-8 estragaria a estrutura. O efeito colateral e que "Comentários"
+     * aparece ali como os bytes UTF-8 vistos um a um. Converter aqui mantem a
+     * afirmacao escrita em portugues de verdade, em vez de afrouxa-la para um
+     * pedaco sem acento.
+     */
+    const comoNoZip = (s) =>
+      new TextDecoder("latin1").decode(new TextEncoder().encode(s));
+
     test("em portugues, as tres saem em portugues", async ({ page }) => {
       await abrir(page, comLivro);
       const ficha = await fichaDe(page);
       expect(ficha).toContain("Cadastro do Livro");
-      expect(ficha).toContain("<dt>Titulo</dt>");
-      expect(ficha).toContain("Disponivel");
+      expect(ficha).toContain("<dt>Título</dt>");
+      expect(ficha).toContain("Disponível");
 
       const relatorio = await relatorioDe(page);
-      expect(relatorio).toContain("Relatorio de Livros");
+      expect(relatorio).toContain("Relatório de Livros");
       expect(relatorio).toContain("Filtros aplicados:");
       expect(relatorio).toContain('lang="pt-BR"');
 
       const planilha = await planilhaDe(page);
-      expect(planilha).toContain("Comentarios");
+      expect(planilha).toContain(comoNoZip("Comentários"));
       expect(planilha).toContain('name="Resultados"');
     });
 
@@ -208,7 +220,7 @@ test.describe("Idioma", () => {
         expect(relatorio).toContain("Books in total:");
         expect(relatorio).toContain("record(s)");
         expect(relatorio).toContain('lang="en"');
-        expect(relatorio).not.toContain("Relatorio de Livros");
+        expect(relatorio).not.toContain("Relatório de Livros");
       });
 
       test("a planilha sai em ingles, cabecalho e aba", async ({ page }) => {

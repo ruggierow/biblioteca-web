@@ -80,7 +80,7 @@ test.describe("Atualizar do Kindle", () => {
       livro("O Nome do Vento", { local: "Kindle", comentarios: COMENTARIO("B0NOVO00001") }),
     ], UM_NOVO);
     await page.click("#btn-lojas");
-    await expect(page.locator("#lojas-resumo")).toContainText("todos ja estao aqui");
+    await expect(page.locator("#lojas-resumo")).toContainText("todos já estão aqui");
     await expect(page.locator("#btn-lojas-confirmar")).toBeHidden();
     expect(await livrosGravados(page)).toHaveLength(1);
   });
