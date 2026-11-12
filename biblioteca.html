@@ -3124,6 +3124,8 @@
                 });
                 const btnR = document.getElementById("btn-recarregar");
                 if (btnR) btnR.style.display = "";
+                const btnSP = document.getElementById("btn-selecionar-pasta");
+                if (btnSP) btnSP.style.display = "";
                 return;
             }
 
@@ -3532,7 +3534,30 @@
         // ===================================================================
 
         /// O hospedeiro que sabe escolher pasta, ou null quando nenhum sabe.
+        ///
+        /// Os dois falam a MESMA lingua -- `escolher`, `olhar`, `vincular`,
+        /// `criar` --, com as mesmas respostas. E o que permite um fluxo so.
         function pontePasta() {
+            // Mac: o unico canal que responde. `postMessage` devolve Promessa
+            // porque o Swift o registrou com `addScriptMessageHandler`.
+            if (window.__BIBLIOTECA_NATIVE__ && window.webkit
+                && window.webkit.messageHandlers.pasta) {
+                const pedir = (op, extra) =>
+                    window.webkit.messageHandlers.pasta.postMessage(Object.assign({ op }, extra));
+                // O caminho mostrado na faixa e injetado na abertura; trocar de
+                // pasta sem atualiza-lo deixaria a faixa apontando para o
+                // arquivo ANTIGO -- com o aplicativo ja gravando no novo.
+                const anotar = (caminho) => { window.__BIBLIOTECA_CAMINHO__ = caminho; };
+                return {
+                    escolher: () => pedir("escolher"),
+                    olhar: (caminho) => pedir("olhar", { caminho }),
+                    vincular: (caminho) => pedir("definir", { caminho }).then(anotar),
+                    criar: (caminho, conteudo) => pedir("criar", { caminho, conteudo }).then(anotar),
+                    // Nao ha o que reler aqui: o Swift rele e reinjeta sozinho
+                    // ao definir a pasta, que e o mesmo caminho do Recarregar.
+                    recarregar: () => Promise.resolve(),
+                };
+            }
             if (window.__TAURI__) {
                 const inv = window.__TAURI__.core.invoke;
                 return {
@@ -6419,6 +6444,16 @@ ${strs.map(s => `<si><t xml:space="preserve">${xmlEsc(s)}</t></si>`).join("")}
         // === Assistente de primeiro uso ===
         (function verificarPrimeiroUso() {
             if (window.__TAURI__) return; // Tauri cria o arquivo automaticamente
+            // No Mac esta janela era um BECO SEM SAIDA: a opcao recomendada
+            // chama o `btn-vincular`, que depende do seletor de arquivos do
+            // navegador (`showDirectoryPicker`) -- e o WKWebView nao o tem. Quem
+            // a escolhesse nao via nada acontecer. E a opcao que funcionava,
+            // "Decidir depois", dizia que os dados ficariam SO no navegador,
+            // o que nunca foi verdade aqui: o Swift grava no arquivo desde a
+            // primeira abertura. Quem faz esse trabalho agora e o botao
+            // "Selecionar pasta", com as mesmas palavras das outras tres
+            // plataformas. A janela continua servindo o navegador comum.
+            if (window.__BIBLIOTECA_NATIVE__) return;
             const jaUsou = localStorage.getItem(STORAGE_KEY) !== null
                         || localStorage.getItem("biblioteca-primeiro-uso-concluido") === "1";
             if (jaUsou) return;

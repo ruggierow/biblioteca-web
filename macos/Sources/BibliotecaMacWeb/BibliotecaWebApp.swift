@@ -24,17 +24,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var gravarTimer: Timer?
     private var gravarDatTimer: Timer?
 
-    // MARK: - Caminhos do iCloud
+    // MARK: - Onde ficam os arquivos
+    //
+    // Ate a 1.9.20 o caminho era CRAVADO no iCloud Drive e nao havia como
+    // muda-lo: quem guarda os livros noutro lugar -- um disco externo, uma
+    // pasta do Dropbox, o Mac sem iCloud ligado -- simplesmente nao tinha
+    // aplicativo. Agora a pasta e escolhida pelo botao "Selecionar pasta", e o
+    // iCloud continua sendo o padrao: quem nunca escolheu nada nao percebe
+    // diferenca nenhuma.
 
-    private var iCloudURL: URL {
+    /// A chave no UserDefaults. O aplicativo NAO e em caixa de areia (veja o
+    /// .entitlements: so `network.client`), entao guardar o caminho em texto
+    /// basta -- nao precisa de marcador com escopo de seguranca como no iPhone.
+    private static let chaveDaPasta = "bibliotecaPasta"
+
+    /// A pasta do iCloud Drive, que e o padrao de quem nunca escolheu nada.
+    private var pastaPadrao: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Biblioteca/biblioteca.txt")
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Biblioteca")
     }
 
-    private var iCloudDatURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs/Biblioteca/biblioteca.dat")
+    /// A pasta em uso: a escolhida, se ainda existir, senao a do iCloud.
+    ///
+    /// O "se ainda existir" nao e zelo: um disco externo desmontado ou uma
+    /// pasta em rede fora do ar fariam o aplicativo gravar num caminho morto.
+    /// Voltar ao padrao e visivel -- a faixa mostra o caminho -- e reversivel.
+    private var pastaDeDados: URL {
+        if let texto = UserDefaults.standard.string(forKey: Self.chaveDaPasta), !texto.isEmpty {
+            var pasta = ObjCBool(false)
+            if FileManager.default.fileExists(atPath: texto, isDirectory: &pasta), pasta.boolValue {
+                return URL(fileURLWithPath: texto, isDirectory: true)
+            }
+        }
+        return pastaPadrao
     }
+
+    private var arquivoDaBiblioteca: URL { pastaDeDados.appendingPathComponent("biblioteca.txt") }
+    private var arquivoDasCapas: URL { pastaDeDados.appendingPathComponent("biblioteca.dat") }
 
     // MARK: - Ciclo de vida
 
@@ -57,11 +83,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.userContentController.add(self, name: "kindleCapas")
         config.userContentController.add(self, name: "audibleListar")
 
+        // "Selecionar pasta" e o unico canal que RESPONDE. Os outros sao de mao
+        // unica -- a pagina avisa e segue -- mas aqui cada passo depende da
+        // resposta do anterior: o que ha na pasta decide qual pergunta fazer.
+        // `addScriptMessageHandler` devolve uma Promessa do lado do JavaScript,
+        // o que dispensa o vaivem de chamar uma funcao global da pagina de
+        // volta -- e dispensa o estado pendurado que isso exigiria.
+        config.userContentController.addScriptMessageHandler(
+            self, contentWorld: .page, name: "pasta")
+
         // Injeta __BIBLIOTECA_NATIVE__ e o caminho real do arquivo antes do HTML
         // executar qualquer script. O caminho aparece no banner de sincronização,
         // igual ao que o app do Windows mostra — ajuda a diagnosticar quando os
         // dois lados não estão apontando para o mesmo arquivo.
-        let caminhoJS = Self.paraLiteralJS(iCloudURL.path)
+        let caminhoJS = Self.paraLiteralJS(arquivoDaBiblioteca.path)
         let flagNativa = WKUserScript(
             source: """
             window.__BIBLIOTECA_NATIVE__ = true;
@@ -108,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Carregar do iCloud
 
     private func carregarDoICloud() {
-        let url = iCloudURL
+        let url = arquivoDaBiblioteca
         let fm = FileManager.default
 
         guard fm.fileExists(atPath: url.path) else { return } // arquivo ainda não existe
@@ -169,7 +204,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func carregarFotosDoICloud() {
-        let url = iCloudDatURL
+        let url = arquivoDasCapas
         let fm = FileManager.default
 
         // Se biblioteca.dat ainda não existe, exporta o localStorage atual para criá-lo
@@ -378,7 +413,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Roda na `filaDat`, nunca na linha principal: não pode tocar a tela a não
     /// ser voltando para a fila principal, como faz o alerta de erro abaixo.
     private func gravarDatNoICloud(_ json: String) {
-        let url = iCloudDatURL
+        let url = arquivoDasCapas
         backupAutomatico(url, maximo: maxBackupDat, feito: &backupDatFeito)
         print("gravarDat: gravando em", url.path, "(\(json.count) bytes)")
         do {
@@ -406,7 +441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func gravarNoICloud(_ conteudo: String) {
-        let url = iCloudURL
+        let url = arquivoDaBiblioteca
         backupAutomatico(url, maximo: maxBackupTxt, feito: &backupTxtFeito)
         do {
             try FileManager.default.createDirectory(
@@ -441,13 +476,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let arquivoItem = NSMenuItem()
         menuBar.addItem(arquivoItem)
         let arquivoMenu = NSMenu(title: "Arquivo")
-        let itemRecarregar = NSMenuItem(title: "Recarregar do iCloud",
+        let itemRecarregar = NSMenuItem(title: "Recarregar",
                                         action: #selector(recarregarDoICloud),
                                         keyEquivalent: "r")
         itemRecarregar.target = self
         arquivoMenu.addItem(itemRecarregar)
 
-        let itemExportarFotos = NSMenuItem(title: "Exportar Fotos para iCloud",
+        let itemExportarFotos = NSMenuItem(title: "Exportar as capas",
                                            action: #selector(exportarFotosManualmente),
                                            keyEquivalent: "")
         itemExportarFotos.target = self
@@ -474,7 +509,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // capa apagada aqui volta na sincronização seguinte do iPhone, que ainda a
     // tem. Contrato em comum/exclusao-de-fotos.md.
 
-    private var pastaDeDados: URL { iCloudURL.deletingLastPathComponent() }
     private var registroURL: URL { pastaDeDados.appendingPathComponent("biblioteca-removidas.json") }
 
     private func registrarRemocoes(_ ids: [String]) {
@@ -606,7 +640,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// o arquivo para a pasta Downloads — comportamento diferente do Windows,
     /// que sempre salvou ao lado do original.
     private func fazerBackup(_ sufixo: String) {
-        let origem = iCloudURL
+        let origem = arquivoDaBiblioteca
         let fm = FileManager.default
 
         guard fm.fileExists(atPath: origem.path) else {
@@ -842,6 +876,163 @@ extension AppDelegate: WKUIDelegate {
 }
 
 // MARK: - WKScriptMessageHandler — recebe TSV do HTML e grava no iCloud
+
+// MARK: - "Selecionar pasta"
+//
+// As quatro operacoes que o fluxo da pagina usa. A pagina e a MESMA do
+// Windows: quem decide os ramos e o `selecionarPasta()` do biblioteca.html, e
+// aqui ficam so os quatro servicos que ele pede. Os nomes e o formato das
+// respostas sao os mesmos dos comandos do Rust, de proposito -- se divergissem,
+// o fluxo teria de saber em que aplicativo esta rodando.
+
+extension AppDelegate {
+
+    /// O painel de pastas do sistema, ja posicionado na pasta em uso.
+    ///
+    /// Assim o passo vira uma CONFIRMACAO em vez de uma procura, e o acerto
+    /// automatico do iCloud nao se perde. Devolve "" quando se fecha sem
+    /// escolher: cancelar nao e erro.
+    func escolherPastaNoPainel() -> String {
+        let painel = NSOpenPanel()
+        painel.canChooseFiles = false
+        painel.canChooseDirectories = true
+        painel.allowsMultipleSelection = false
+        painel.canCreateDirectories = true
+        painel.directoryURL = pastaDeDados
+        painel.message = "Escolha a pasta onde fica o seu biblioteca.txt"
+        painel.prompt = "Selecionar"
+        guard painel.runModal() == .OK, let url = painel.url else { return "" }
+        return url.path
+    }
+
+    /// Passa a usar a pasta e rele tudo dela.
+    func definirPasta(_ pasta: URL) -> String {
+        UserDefaults.standard.set(pasta.path, forKey: Self.chaveDaPasta)
+        recarregarDoICloud()
+        return arquivoDaBiblioteca.path
+    }
+
+    /// Cria o biblioteca.txt na pasta e passa a usa-la.
+    ///
+    /// NAO SOBRESCREVE: se o arquivo apareceu entre o olhar e esta chamada,
+    /// recusa com `ja_existe` e a pagina volta ao ramo "achei uma biblioteca".
+    /// O iCloud baixa arquivo renomeando e trocando depois; sem esta checagem o
+    /// aplicativo poderia zerar a biblioteca de alguem no intervalo.
+    ///
+    /// Escreve o arquivo ANTES de guardar a pasta: na ordem inversa, uma falha
+    /// de escrita deixaria o aplicativo apontado para uma pasta sem biblioteca.
+    func criarNaPasta(_ pasta: URL, conteudo: String) throws -> String {
+        _ = try criarArquivoNaPasta(pasta, conteudo: conteudo)
+        return definirPasta(pasta)
+    }
+}
+
+// MARK: - As duas que mexem em ARQUIVO
+//
+// Fora do AppDelegate de proposito: sao as unicas partes do "Selecionar pasta"
+// que podem PERDER dado, e aqui elas rodam nos testes (`swift test`) sem subir
+// a aplicacao inteira -- sem janela, sem WKWebView e sem tocar no
+// UserDefaults da maquina de quem roda os testes. Espelham `olhar` e
+// `criar_arquivo_na_pasta` do Rust do Windows; se divergirem, o mesmo botao
+// faria coisas diferentes nos dois aplicativos.
+
+enum ErroDePasta: Error, Equatable { case mensagem(String) }
+
+/// Olha a pasta ANTES de vincular: ha biblioteca.txt? da para ler? o que tem?
+///
+/// Devolve o CONTEUDO, nao uma contagem: quem conta os livros e a mesma
+/// `parseTSV` da pagina que vai carrega-los. Dois leitores de TSV divergem --
+/// e o numero que o usuario le na pergunta tem de ser o que ele vera na tela.
+func olharAPasta(_ pasta: URL) -> [String: Any] {
+    let fm = FileManager.default
+    func resposta(_ tem: Bool, _ conteudo: String, _ erro: String) -> [String: Any] {
+        ["nome": pasta.lastPathComponent, "caminho": pasta.path,
+         "temArquivo": tem, "conteudo": conteudo, "erro": erro]
+    }
+    var ehPasta = ObjCBool(false)
+    guard fm.fileExists(atPath: pasta.path, isDirectory: &ehPasta), ehPasta.boolValue else {
+        return resposta(false, "", "A pasta não existe: \(pasta.path)")
+    }
+    let arquivo = pasta.appendingPathComponent("biblioteca.txt")
+    // `fileExists` tambem e verdadeiro para um DIRETORIO chamado
+    // biblioteca.txt. E de proposito: ha arquivo no caminho, so nao da para
+    // ler -- e o certo entao e avisar, nunca criar por cima.
+    guard fm.fileExists(atPath: arquivo.path) else { return resposta(false, "", "") }
+
+    // No iCloud o arquivo pode existir so como marcador, com o conteudo ainda
+    // na nuvem. Pedir o download e esperar um pouco e o que o
+    // `carregarDoICloud` ja faz na abertura -- sem isto, escolher uma pasta do
+    // iCloud recem-sincronizada cairia no ramo "nao consegui ler".
+    if (try? arquivo.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?
+        .ubiquitousItemDownloadingStatus == .some(.notDownloaded) {
+        try? fm.startDownloadingUbiquitousItem(at: arquivo)
+    }
+    var ultimoErro = ""
+    for tentativa in 0..<3 {
+        do {
+            return resposta(true, try String(contentsOf: arquivo, encoding: .utf8), "")
+        } catch {
+            ultimoErro = error.localizedDescription
+            Thread.sleep(forTimeInterval: 0.4 * Double(tentativa + 1))
+        }
+    }
+    return resposta(true, "", ultimoErro)
+}
+
+/// Cria o biblioteca.txt na pasta e devolve o caminho dele.
+///
+/// NAO SOBRESCREVE: se o arquivo apareceu entre o olhar e esta chamada, recusa
+/// com `ja_existe` e a pagina volta ao ramo "achei uma biblioteca". O iCloud
+/// baixa arquivo renomeando e trocando depois; sem esta checagem o aplicativo
+/// poderia zerar a biblioteca de alguem no intervalo.
+func criarArquivoNaPasta(_ pasta: URL, conteudo: String) throws -> URL {
+    let fm = FileManager.default
+    var ehPasta = ObjCBool(false)
+    guard fm.fileExists(atPath: pasta.path, isDirectory: &ehPasta), ehPasta.boolValue else {
+        throw ErroDePasta.mensagem("A pasta não existe: \(pasta.path)")
+    }
+    let arquivo = pasta.appendingPathComponent("biblioteca.txt")
+    if fm.fileExists(atPath: arquivo.path) { throw ErroDePasta.mensagem("ja_existe") }
+    try conteudo.write(to: arquivo, atomically: true, encoding: .utf8)
+    return arquivo
+}
+
+// MARK: - O canal que RESPONDE
+
+extension AppDelegate: WKScriptMessageHandlerWithReply {
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage,
+                               replyHandler: @escaping (Any?, String?) -> Void) {
+        guard let pedido = message.body as? [String: Any],
+              let operacao = pedido["op"] as? String else {
+            replyHandler(nil, "pedido sem operação"); return
+        }
+        let pasta: URL? = (pedido["caminho"] as? String).map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+        switch operacao {
+        case "escolher":
+            replyHandler(escolherPastaNoPainel(), nil)
+        case "olhar":
+            guard let pasta else { replyHandler(nil, "sem caminho"); return }
+            replyHandler(olharAPasta(pasta), nil)
+        case "definir":
+            guard let pasta else { replyHandler(nil, "sem caminho"); return }
+            replyHandler(definirPasta(pasta), nil)
+        case "criar":
+            guard let pasta else { replyHandler(nil, "sem caminho"); return }
+            do {
+                replyHandler(try criarNaPasta(pasta, conteudo: pedido["conteudo"] as? String ?? ""), nil)
+            } catch ErroDePasta.mensagem(let m) {
+                replyHandler(nil, m)
+            } catch {
+                replyHandler(nil, error.localizedDescription)
+            }
+        default:
+            replyHandler(nil, "operação desconhecida: \(operacao)")
+        }
+    }
+}
 
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController,
